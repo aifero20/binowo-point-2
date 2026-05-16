@@ -7,6 +7,10 @@ import {
   Warehouse as WarehouseIcon,
   ShoppingCart,
   ShoppingBag,
+  Clock,
+  RotateCcw,
+  ArrowRightLeft,
+  BarChart2,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -26,6 +30,10 @@ const NAV = [
   { to: "/suppliers", label: "Supplier", icon: Truck },
   { to: "/customers", label: "Customer", icon: Users },
   { to: "/warehouses", label: "Gudang", icon: WarehouseIcon },
+  { to: "/shifts", label: "Shift Kasir", icon: Clock },
+  { to: "/transfers", label: "Transfer Stok", icon: ArrowRightLeft },
+  { to: "/returns", label: "Retur Pembelian", icon: RotateCcw },
+  { to: "/reports", label: "Laporan", icon: BarChart2 },
 ] as const;
 
 export function AppShell() {
