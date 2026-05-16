@@ -13,6 +13,7 @@ import {
   BarChart2,
   SlidersHorizontal,
   UserCog,
+  History,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -38,6 +39,7 @@ const NAV = [
   { to: "/reports", label: "Laporan", icon: BarChart2 },
   { to: "/adjustments", label: "Adjustment Stok", icon: SlidersHorizontal },
   { to: "/users", label: "Manajemen User", icon: UserCog },
+  { to: "/price-history", label: "Riwayat Harga", icon: History },
 ] as const;
 
 export function AppShell() {
