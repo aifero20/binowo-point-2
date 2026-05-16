@@ -33,7 +33,7 @@ function SalesPOS() {
   const [paymentMethod, setPaymentMethod] = useState("TUNAI");
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [offlineMode, setOfflineMode] = useState(!isOnline());
-  const [customerId, setCustomerId] = useState<string>("");
+  const [customerId, setCustomerId] = useState<string>("none");
   const [headerDiscount, setHeaderDiscount] = useState(0);
 
   useEffect(() => {
@@ -116,7 +116,7 @@ function SalesPOS() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
       const sales_number = "SO" + Date.now();
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, customer_id: customerId || null, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
@@ -128,7 +128,7 @@ function SalesPOS() {
       setPrintData(data);
       setCart([]);
       setPaymentAmount(0);
-      setCustomerId("");
+      setCustomerId("none");
       setHeaderDiscount(0);
       qc.invalidateQueries();
     },
@@ -235,7 +235,7 @@ function SalesPOS() {
                     <Select value={customerId} onValueChange={setCustomerId}>
                       <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Umum / Walk-in</SelectItem>
+                        <SelectItem value="none">Umum / Walk-in</SelectItem>
                         {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                       </SelectContent>
                     </Select>
