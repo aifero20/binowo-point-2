@@ -42,7 +42,8 @@ function SalesPOS() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [cart, warehouseId, checkout]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onOnline = () => { setOfflineMode(false); syncPendingSales(); };
