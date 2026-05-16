@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 
@@ -52,6 +53,36 @@ function ProductsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const [unitDialog, setUnitDialog] = useState<string | null>(null);
+  const [unitForm, setUnitForm] = useState({ unit_name: "", conversion_qty: 1, retail_price: 0, wholesale_price: 0 });
+
+  const { data: units = [] } = useQuery({
+    queryKey: ["product-units", unitDialog],
+    queryFn: async () => {
+      if (!unitDialog) return [];
+      const { data } = await supabase.from("product_units").select("*").eq("product_id", unitDialog);
+      return data ?? [];
+    },
+    enabled: !!unitDialog,
+  });
+
+  const saveUnit = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("product_units").insert({ ...unitForm, product_id: unitDialog } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Satuan ditambahkan"); qc.invalidateQueries({ queryKey: ["product-units"] }); setUnitForm({ unit_name: "", conversion_qty: 1, retail_price: 0, wholesale_price: 0 }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const delUnit = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_units").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Satuan dihapus"); qc.invalidateQueries({ queryKey: ["product-units"] }); },
+  });
+
   const del = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", id);
@@ -85,6 +116,7 @@ function ProductsPage() {
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(p); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" title="Satuan" onClick={() => setUnitDialog(p.id)}><Package2 className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => { if (confirm("Hapus barang?")) del.mutate(p.id); }}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </TableCell>
@@ -93,6 +125,36 @@ function ProductsPage() {
           </TableBody>
         </Table>
       </CardContent></Card>
+      {/* Unit Dialog */}
+      <Dialog open={!!unitDialog} onOpenChange={(o) => { if (!o) setUnitDialog(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Multi Satuan</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-2">
+              <div className="space-y-1"><Label className="text-xs">Satuan</Label><Input placeholder="DUS" value={unitForm.unit_name} onChange={(e) => setUnitForm({ ...unitForm, unit_name: e.target.value })} className="h-8" /></div>
+              <div className="space-y-1"><Label className="text-xs">Konversi</Label><Input type="number" value={unitForm.conversion_qty} onChange={(e) => setUnitForm({ ...unitForm, conversion_qty: Number(e.target.value) })} className="h-8" /></div>
+              <div className="space-y-1"><Label className="text-xs">Harga Retail</Label><Input type="number" value={unitForm.retail_price} onChange={(e) => setUnitForm({ ...unitForm, retail_price: Number(e.target.value) })} className="h-8" /></div>
+              <div className="space-y-1"><Label className="text-xs">Harga Grosir</Label><Input type="number" value={unitForm.wholesale_price} onChange={(e) => setUnitForm({ ...unitForm, wholesale_price: Number(e.target.value) })} className="h-8" /></div>
+            </div>
+            <Button size="sm" onClick={() => saveUnit.mutate()} disabled={!unitForm.unit_name || saveUnit.isPending}>+ Tambah Satuan</Button>
+            <Table>
+              <TableHeader><TableRow><TableHead>Satuan</TableHead><TableHead>Konversi</TableHead><TableHead>Retail</TableHead><TableHead>Grosir</TableHead><TableHead className="w-10" /></TableRow></TableHeader>
+              <TableBody>
+                {units.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-4">Belum ada satuan tambahan.</TableCell></TableRow>}
+                {units.map((u: { id: string; unit_name: string; conversion_qty: number; retail_price: number; wholesale_price: number }) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.unit_name}</TableCell>
+                    <TableCell>{u.conversion_qty}x</TableCell>
+                    <TableCell>{u.retail_price?.toLocaleString("id-ID")}</TableCell>
+                    <TableCell>{u.wholesale_price?.toLocaleString("id-ID")}</TableCell>
+                    <TableCell><Button size="icon" variant="ghost" onClick={() => delUnit.mutate(u.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
