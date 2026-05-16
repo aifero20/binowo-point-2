@@ -15,6 +15,9 @@ import { Trash2, ShoppingCart, PauseCircle, PlayCircle, XCircle, Printer } from 
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { isOnline, saveOfflineSale, syncPendingSales } from "@/lib/offline-sync";
+import { db } from "@/lib/db";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
@@ -29,6 +32,16 @@ function SalesPOS() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("TUNAI");
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
+  const [offlineMode, setOfflineMode] = useState(!isOnline());
+
+  useEffect(() => {
+    const onOnline = () => { setOfflineMode(false); syncPendingSales(); };
+    const onOffline = () => setOfflineMode(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    syncPendingSales();
+    return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
+  }, []);
   const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number } | null>(null);
 
   const { data: products = [] } = useQuery({
@@ -164,7 +177,7 @@ function SalesPOS() {
             </Card>
 
             <Card className="h-fit sticky top-20">
-              <CardHeader><CardTitle>Keranjang</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">● OFFLINE</span>}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
