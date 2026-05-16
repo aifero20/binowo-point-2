@@ -47,7 +47,7 @@ function SalesPOS() {
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_retail_price").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_retail_price, current_wholesale_price, product_units(id, unit_name, conversion_qty, retail_price, wholesale_price)").is("deleted_at", null).limit(20);
       if (search) q = q.or(`product_name.ilike.%${search}%,product_code.ilike.%${search}%,barcode.ilike.%${search}%`);
       const { data, error } = await q;
       if (error) throw error;
@@ -81,11 +81,13 @@ function SalesPOS() {
   const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price, 0), [cart]);
   const change = paymentAmount - subtotal;
 
-  function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number }) {
+  function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number }, unitName?: string, price?: number, conv?: number) {
+    const unit = unitName ?? p.default_unit;
+    const sp = price ?? Number(p.current_retail_price);
     setCart((prev) => {
-      const existing = prev.find((l) => l.product_id === p.id);
-      if (existing) return prev.map((l) => l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l);
-      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, selling_price: Number(p.current_retail_price) }];
+      const existing = prev.find((l) => l.product_id === p.id && l.unit_name === unit);
+      if (existing) return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l);
+      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp }];
     });
   }
 
@@ -164,11 +166,18 @@ function SalesPOS() {
                   <TableBody>
                     {products.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Ketik untuk cari barang...</TableCell></TableRow>}
                     {products.map((p) => (
-                      <TableRow key={p.id} className="cursor-pointer hover:bg-accent/40" onClick={() => addToCart(p)}>
+                      <TableRow key={p.id} className="cursor-pointer hover:bg-accent/40" onClick={() => addToCart(p, p.default_unit, Number(p.current_retail_price), 1)}>
                         <TableCell className="font-mono text-xs">{p.product_code}</TableCell>
                         <TableCell className="font-medium">{p.product_name}</TableCell>
                         <TableCell className="text-right">{formatRp(p.current_retail_price)}</TableCell>
-                        <TableCell><Button size="sm" onClick={(e) => { e.stopPropagation(); addToCart(p); }}>+ Tambah</Button></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); addToCart(p, p.default_unit, Number(p.current_retail_price), 1); }}>+ {p.default_unit}</Button>
+                            {(p.product_units as { id: string; unit_name: string; conversion_qty: number; retail_price: number }[] ?? []).map((u) => (
+                              <Button key={u.id} size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); addToCart(p, u.unit_name, Number(u.retail_price), Number(u.conversion_qty)); }}>+ {u.unit_name}</Button>
+                            ))}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
