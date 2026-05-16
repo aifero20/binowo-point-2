@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { formatRp } from "@/lib/format";
+import { toast } from "sonner";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/reports")({ component: ReportsPage });
 
@@ -15,6 +17,28 @@ function ReportsPage() {
   const today = new Date().toISOString().split("T")[0];
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
+
+  const [syncing, setSyncing] = useState(false);
+
+  async function syncToSheets() {
+    setSyncing(true);
+    try {
+      const { data: sales } = await sb.from("sales_headers").select("sales_number, transaction_date, grand_total, payment_method, transaction_status, cashier_id").gte("transaction_date", dateFrom).lte("transaction_date", dateTo + "T23:59:59").is("deleted_at", null);
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-sheets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ type: "sales", data: sales ?? [] }),
+      });
+      const result = await res.json();
+      if (result.ok) toast.success("Berhasil sync ke Google Sheets!");
+      else toast.error("Sync gagal: " + JSON.stringify(result.error));
+    } catch (e) {
+      toast.error("Sync error: " + String(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const { data: summary } = useQuery({
     queryKey: ["report-summary", dateFrom, dateTo],
@@ -61,6 +85,9 @@ function ReportsPage() {
       <div className="flex flex-wrap gap-4 items-end">
         <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
+        <Button variant="outline" onClick={syncToSheets} disabled={syncing} className="gap-2">
+          {syncing ? "Syncing..." : "☁ Sync ke Google Sheets"}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
