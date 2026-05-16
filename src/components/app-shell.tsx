@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   UserCog,
   History,
+  Banknote,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -40,6 +41,7 @@ const NAV = [
   { to: "/adjustments", label: "Adjustment Stok", icon: SlidersHorizontal },
   { to: "/users", label: "Manajemen User", icon: UserCog },
   { to: "/price-history", label: "Riwayat Harga", icon: History },
+  { to: "/debts", label: "Hutang Supplier", icon: Banknote },
 ] as const;
 
 export function AppShell() {

@@ -75,7 +75,7 @@ function PurchasesPage() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (lines.length === 0) throw new Error("Tambah item dulu");
       const purchase_number = "PO" + Date.now();
-      const { data: header, error: he } = await supabase.from("purchase_headers").insert({ purchase_number, invoice_number: invoiceNumber, supplier_id: supplierId, subtotal: grandTotal, grand_total: grandTotal, payment_status: "LUNAS", created_by: user!.id } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("purchase_headers").insert({ purchase_number, invoice_number: invoiceNumber, supplier_id: supplierId, subtotal: grandTotal, grand_total: grandTotal, payment_status: paymentStatus, created_by: user!.id } as never).select("id").single();
       if (he) throw he;
       const pid = (header as { id: string }).id;
       const details = lines.map((l) => ({ purchase_id: pid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, buy_price: l.buy_price, retail_price: l.retail_price, wholesale_price: l.wholesale_price, total: l.qty * l.buy_price }));
@@ -84,6 +84,9 @@ function PurchasesPage() {
       const movements = lines.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "purchase", reference_number: purchase_number, qty_in: l.qty, created_by: user!.id }));
       const { error: me } = await supabase.from("stock_movements").insert(movements as never);
       if (me) throw me;
+      if (paymentStatus === "HUTANG") {
+        await supabase.from("supplier_debts").insert({ supplier_id: supplierId, purchase_id: pid, amount: grandTotal, paid_amount: 0, remaining: grandTotal, due_date: dueDate || null, status: "BELUM_LUNAS" } as never);
+      }
       for (const l of lines) {
         await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
       }
