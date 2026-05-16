@@ -21,7 +21,7 @@ import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
-type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number };
+type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number };
 
 function SalesPOS() {
   const { user } = useAuth();
@@ -33,6 +33,16 @@ function SalesPOS() {
   const [paymentMethod, setPaymentMethod] = useState("TUNAI");
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [offlineMode, setOfflineMode] = useState(!isOnline());
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "F2") { e.preventDefault(); document.querySelector<HTMLInputElement>('[placeholder*="barcode"]')?.focus(); }
+      if (e.key === "F12") { e.preventDefault(); if (cart.length > 0 && warehouseId) checkout.mutate(); }
+      if (e.key === "Escape") { setCart([]); setPaymentAmount(0); }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [cart, warehouseId, checkout]);
 
   useEffect(() => {
     const onOnline = () => { setOfflineMode(false); syncPendingSales(); };
@@ -78,7 +88,7 @@ function SalesPOS() {
     },
   });
 
-  const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
   const change = paymentAmount - subtotal;
 
   function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number }, unitName?: string, price?: number, conv?: number) {
@@ -158,7 +168,7 @@ function SalesPOS() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" />Cari Barang</CardTitle>
-                <Input autoFocus placeholder="Scan barcode / cari nama barang..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-12 text-base" />
+                <Input autoFocus placeholder="Scan barcode / cari nama barang... (F2)" value={search} onChange={(e) => setSearch(e.target.value)} className="h-12 text-base" />
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -217,6 +227,7 @@ function SalesPOS() {
                         <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} × {l.qty}</p>
                       </div>
                       <Input type="number" min={1} value={l.qty} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="w-16 h-8" />
+                      <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value), selling_price: x.selling_price } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
                       <Button size="icon" variant="ghost" onClick={() => setCart((c) => c.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   ))}
@@ -248,7 +259,7 @@ function SalesPOS() {
                     <PauseCircle className="h-4 w-4" />Hold
                   </Button>
                   <Button size="lg" disabled={checkout.isPending || cart.length === 0} onClick={() => checkout.mutate()}>
-                    {checkout.isPending ? "Memproses..." : "Bayar"}
+                    {checkout.isPending ? "Memproses..." : "Bayar (F12)"}
                   </Button>
                 </div>
               </CardContent>

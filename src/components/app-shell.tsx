@@ -15,6 +15,7 @@ import {
   UserCog,
   History,
   Banknote,
+  ScrollText,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -42,6 +43,7 @@ const NAV = [
   { to: "/users", label: "Manajemen User", icon: UserCog },
   { to: "/price-history", label: "Riwayat Harga", icon: History },
   { to: "/debts", label: "Hutang Supplier", icon: Banknote },
+  { to: "/activity-logs", label: "Activity Log", icon: ScrollText },
 ] as const;
 
 export function AppShell() {

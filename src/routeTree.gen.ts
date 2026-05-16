@@ -29,6 +29,7 @@ import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedAdjustmentsRouteImport } from './routes/_authenticated/adjustments'
+import { Route as AuthenticatedActivityLogsRouteImport } from './routes/_authenticated/activity-logs'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -131,11 +132,18 @@ const AuthenticatedAdjustmentsRoute =
     path: '/adjustments',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedActivityLogsRoute =
+  AuthenticatedActivityLogsRouteImport.update({
+    id: '/activity-logs',
+    path: '/activity-logs',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/activity-logs': typeof AuthenticatedActivityLogsRoute
   '/adjustments': typeof AuthenticatedAdjustmentsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -157,6 +165,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/activity-logs': typeof AuthenticatedActivityLogsRoute
   '/adjustments': typeof AuthenticatedAdjustmentsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -180,6 +189,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_authenticated/activity-logs': typeof AuthenticatedActivityLogsRoute
   '/_authenticated/adjustments': typeof AuthenticatedAdjustmentsRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/activity-logs'
     | '/adjustments'
     | '/customers'
     | '/dashboard'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
+    | '/activity-logs'
     | '/adjustments'
     | '/customers'
     | '/dashboard'
@@ -246,6 +258,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/register'
+    | '/_authenticated/activity-logs'
     | '/_authenticated/adjustments'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
@@ -413,10 +426,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdjustmentsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/activity-logs': {
+      id: '/_authenticated/activity-logs'
+      path: '/activity-logs'
+      fullPath: '/activity-logs'
+      preLoaderRoute: typeof AuthenticatedActivityLogsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedActivityLogsRoute: typeof AuthenticatedActivityLogsRoute
   AuthenticatedAdjustmentsRoute: typeof AuthenticatedAdjustmentsRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -436,6 +457,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedActivityLogsRoute: AuthenticatedActivityLogsRoute,
   AuthenticatedAdjustmentsRoute: AuthenticatedAdjustmentsRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
