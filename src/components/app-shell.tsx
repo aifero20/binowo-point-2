@@ -11,6 +11,8 @@ import {
   RotateCcw,
   ArrowRightLeft,
   BarChart2,
+  SlidersHorizontal,
+  UserCog,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -34,6 +36,8 @@ const NAV = [
   { to: "/transfers", label: "Transfer Stok", icon: ArrowRightLeft },
   { to: "/returns", label: "Retur Pembelian", icon: RotateCcw },
   { to: "/reports", label: "Laporan", icon: BarChart2 },
+  { to: "/adjustments", label: "Adjustment Stok", icon: SlidersHorizontal },
+  { to: "/users", label: "Manajemen User", icon: UserCog },
 ] as const;
 
 export function AppShell() {
