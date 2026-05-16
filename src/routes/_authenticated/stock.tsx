@@ -13,12 +13,15 @@ type Movement = { id: string; movement_date: string; transaction_type: string; r
 
 function StockPage() {
   const [search, setSearch] = useState("");
+  const [productFilter, setProductFilter] = useState("");
+  const [searchProduct, setSearchProduct] = useState("");
 
   const { data = [] } = useQuery({
-    queryKey: ["stock-movements", search],
+    queryKey: ["stock-movements", search, productFilter],
     queryFn: async () => {
       let q = supabase.from("stock_movements").select("id, movement_date, transaction_type, reference_number, qty_in, qty_out, balance_after, products(product_name, product_code), warehouses(warehouse_name)").order("movement_date", { ascending: false }).limit(100);
       if (search) q = q.or(`reference_number.ilike.%${search}%`);
+      if (productFilter) q = q.eq("product_id", productFilter);
       const { data, error } = await q;
       if (error) throw error;
       return data as Movement[];
@@ -29,7 +32,11 @@ function StockPage() {
 
   return (
     <div className="space-y-4">
-      <Input placeholder="Cari no. referensi..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+      <div className="flex flex-wrap gap-2">
+        <Input placeholder="Cari no. referensi..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <Input placeholder="Filter product ID..." value={searchProduct} onChange={(e) => { setSearchProduct(e.target.value); setProductFilter(e.target.value); }} className="max-w-xs" />
+        {productFilter && <button className="text-xs text-muted-foreground underline" onClick={() => { setProductFilter(""); setSearchProduct(""); }}>Reset filter</button>}
+      </div>
       <Card><CardContent className="p-0">
         <Table>
           <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Tipe</TableHead><TableHead>Referensi</TableHead><TableHead>Barang</TableHead><TableHead>Gudang</TableHead><TableHead className="text-right">Masuk</TableHead><TableHead className="text-right">Keluar</TableHead><TableHead className="text-right">Saldo</TableHead></TableRow></TableHeader>

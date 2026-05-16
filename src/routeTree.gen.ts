@@ -25,6 +25,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPriceHistoryRouteImport } from './routes/_authenticated/price-history'
+import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenticated/permissions'
 import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/debts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
@@ -111,6 +112,12 @@ const AuthenticatedPriceHistoryRoute =
     path: '/price-history',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedPermissionsRoute =
+  AuthenticatedPermissionsRouteImport.update({
+    id: '/permissions',
+    path: '/permissions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDebtsRoute = AuthenticatedDebtsRouteImport.update({
   id: '/debts',
   path: '/debts',
@@ -148,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/permissions': typeof AuthenticatedPermissionsRoute
   '/price-history': typeof AuthenticatedPriceHistoryRoute
   '/products': typeof AuthenticatedProductsRoute
   '/purchases': typeof AuthenticatedPurchasesRoute
@@ -170,6 +178,7 @@ export interface FileRoutesByTo {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/permissions': typeof AuthenticatedPermissionsRoute
   '/price-history': typeof AuthenticatedPriceHistoryRoute
   '/products': typeof AuthenticatedProductsRoute
   '/purchases': typeof AuthenticatedPurchasesRoute
@@ -194,6 +203,7 @@ export interface FileRoutesById {
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/debts': typeof AuthenticatedDebtsRoute
+  '/_authenticated/permissions': typeof AuthenticatedPermissionsRoute
   '/_authenticated/price-history': typeof AuthenticatedPriceHistoryRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/purchases': typeof AuthenticatedPurchasesRoute
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/debts'
+    | '/permissions'
     | '/price-history'
     | '/products'
     | '/purchases'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/debts'
+    | '/permissions'
     | '/price-history'
     | '/products'
     | '/purchases'
@@ -263,6 +275,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/debts'
+    | '/_authenticated/permissions'
     | '/_authenticated/price-history'
     | '/_authenticated/products'
     | '/_authenticated/purchases'
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPriceHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/permissions': {
+      id: '/_authenticated/permissions'
+      path: '/permissions'
+      fullPath: '/permissions'
+      preLoaderRoute: typeof AuthenticatedPermissionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/debts': {
       id: '/_authenticated/debts'
       path: '/debts'
@@ -442,6 +462,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDebtsRoute: typeof AuthenticatedDebtsRoute
+  AuthenticatedPermissionsRoute: typeof AuthenticatedPermissionsRoute
   AuthenticatedPriceHistoryRoute: typeof AuthenticatedPriceHistoryRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRoute
@@ -462,6 +483,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDebtsRoute: AuthenticatedDebtsRoute,
+  AuthenticatedPermissionsRoute: AuthenticatedPermissionsRoute,
   AuthenticatedPriceHistoryRoute: AuthenticatedPriceHistoryRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedPurchasesRoute: AuthenticatedPurchasesRoute,

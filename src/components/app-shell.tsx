@@ -16,6 +16,7 @@ import {
   History,
   Banknote,
   ScrollText,
+  ShieldCheck,
   ArrowLeftRight,
   LogOut,
   Store,
@@ -44,6 +45,7 @@ const NAV = [
   { to: "/price-history", label: "Riwayat Harga", icon: History },
   { to: "/debts", label: "Hutang Supplier", icon: Banknote },
   { to: "/activity-logs", label: "Activity Log", icon: ScrollText },
+  { to: "/permissions", label: "Permission Matrix", icon: ShieldCheck },
 ] as const;
 
 export function AppShell() {

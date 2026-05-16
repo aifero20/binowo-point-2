@@ -33,6 +33,8 @@ function SalesPOS() {
   const [paymentMethod, setPaymentMethod] = useState("TUNAI");
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [offlineMode, setOfflineMode] = useState(!isOnline());
+  const [customerId, setCustomerId] = useState<string>("");
+  const [headerDiscount, setHeaderDiscount] = useState(0);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -71,6 +73,11 @@ function SalesPOS() {
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
   });
 
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers-list"],
+    queryFn: async () => { const { data } = await supabase.from("customers").select("id, customer_name, customer_type").is("deleted_at", null).order("customer_name").limit(100); return data ?? []; },
+  });
+
   const { data: heldTransactions = [] } = useQuery({
     queryKey: ["held-sales"],
     queryFn: async () => {
@@ -89,7 +96,8 @@ function SalesPOS() {
     },
   });
 
-  const subtotal = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
+  const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
+  const subtotal = useMemo(() => subtotalBeforeDiscount * (1 - headerDiscount / 100), [subtotalBeforeDiscount, headerDiscount]);
   const change = paymentAmount - subtotal;
 
   function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number }, unitName?: string, price?: number, conv?: number) {
@@ -108,7 +116,7 @@ function SalesPOS() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
       const sales_number = "SO" + Date.now();
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, cashier_id: user!.id, subtotal, grand_total: subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, customer_id: customerId || null, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
@@ -120,6 +128,8 @@ function SalesPOS() {
       setPrintData(data);
       setCart([]);
       setPaymentAmount(0);
+      setCustomerId("");
+      setHeaderDiscount(0);
       qc.invalidateQueries();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -219,6 +229,22 @@ function SalesPOS() {
                     </Select>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label>Customer</Label>
+                    <Select value={customerId} onValueChange={setCustomerId}>
+                      <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Umum / Walk-in</SelectItem>
+                        {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Diskon Header (%)</Label>
+                    <Input type="number" min={0} max={100} value={headerDiscount} onChange={(e) => setHeaderDiscount(Number(e.target.value))} placeholder="0" />
+                  </div>
+                </div>
                 <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
                   {cart.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Keranjang kosong</p>}
                   {cart.map((l, i) => (
@@ -233,6 +259,16 @@ function SalesPOS() {
                     </div>
                   ))}
                 </div>
+                {headerDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Subtotal</span><span>{formatRp(subtotalBeforeDiscount)}</span>
+                  </div>
+                )}
+                {headerDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-red-500">
+                    <span>Diskon {headerDiscount}%</span><span>-{formatRp(subtotalBeforeDiscount - subtotal)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold border-t pt-3">
                   <span>Total</span><span className="text-primary">{formatRp(subtotal)}</span>
                 </div>
