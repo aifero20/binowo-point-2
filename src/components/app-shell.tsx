@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate, Outlet } from "@tanstack/react-router";
+import { OfflineIndicator } from "@/components/offline-indicator";
 import {
   LayoutDashboard,
   Package,
@@ -123,6 +124,7 @@ export function AppShell() {
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
+      <OfflineIndicator />
         </main>
       </div>
     </div>
