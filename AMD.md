@@ -13,6 +13,11 @@ Baca file ini sebelum melakukan apapun di project ini.
 
 ---
 
+## CATATAN TERBARU (2026-05-18)
+Phase 6: PWA config aktif, service worker cache Supabase API, icon 192+512px tersedia. App bisa di-install dari browser.
+
+---
+
 ## ATURAN WAJIB AI
 
 1. SELALU gunakan python3 untuk membuat/edit file, JANGAN paste code langsung ke terminal
@@ -135,7 +140,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY = eyJ... (anon key dari Supabase)
 - [x] Phase 3 - Hold/Void Transaksi, Struk Print, Multi Metode Bayar
 - [x] Phase 4 - Stock Adjustment, User Management
 - [x] Phase 5 - Dashboard Alert Stok, Price History
-- [ ] Phase 6 - Offline Sync (IndexedDB/Dexie), Google Sheets Backup
+- [x] Phase 6 - Offline Sync (IndexedDB/Dexie), Google Sheets Backup
 
 ---
 
