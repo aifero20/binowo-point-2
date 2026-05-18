@@ -26,14 +26,14 @@ function ReportsPage() {
     try {
       const { data: sales } = await sb.from("sales_headers").select("sales_number, transaction_date, grand_total, payment_method, transaction_status, cashier_id").gte("transaction_date", dateFrom).lte("transaction_date", dateTo + "T23:59:59").is("deleted_at", null);
       const { data: { session } } = await sb.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-sheets`, {
+      const res = await fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ type: "sales", data: sales ?? [] }),
+        body: JSON.stringify({ type: "all" }),
       });
       const result = await res.json();
-      if (result.ok) toast.success("Berhasil sync ke Google Sheets!");
-      else toast.error("Sync gagal: " + JSON.stringify(result.error));
+      if (result.success) toast.success("Berhasil sync ke Google Sheets!");
+      else toast.error("Sync gagal: " + JSON.stringify(result));
     } catch (e) {
       toast.error("Sync error: " + String(e));
     } finally {
