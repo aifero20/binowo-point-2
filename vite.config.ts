@@ -1,16 +1,44 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - tanstackStart, viteReact, tailwindcss, tsConfigPaths, cloudflare (build-only),
-//     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
-//     error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-// @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
 export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
+  },
+  vite: {
+    plugins: [
+      VitePWA({
+        registerType: "autoUpdate",
+        includeAssets: ["icon-192.png", "icon-512.png"],
+        manifest: {
+          name: "Binowo Kasir",
+          short_name: "Binowo",
+          description: "Aplikasi kasir grosir rokok",
+          start_url: "/",
+          display: "standalone",
+          background_color: "#ffffff",
+          theme_color: "#2563eb",
+          orientation: "portrait-primary",
+          icons: [
+            { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+            { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          ],
+        },
+        workbox: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/bapgptjffhufykvoxtnq\.supabase\.co\/rest\/v1\//,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "supabase-api",
+                expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
+                networkTimeoutSeconds: 5,
+              },
+            },
+          ],
+        },
+      }),
+    ],
   },
 });
