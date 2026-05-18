@@ -14,7 +14,7 @@ Baca file ini sebelum melakukan apapun di project ini.
 ---
 
 ## CATATAN TERBARU (2026-05-18)
-Phase 6: PWA config aktif, service worker cache Supabase API, icon 192+512px tersedia. App bisa di-install dari browser.
+Phase 6 selesai: PWA installable, service worker, offline IndexedDB queue (Dexie), auto sync saat online, product cache 500 item, OfflineIndicator di corner kanan bawah.
 
 ---
 
