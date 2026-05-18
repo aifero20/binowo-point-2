@@ -14,7 +14,7 @@ Baca file ini sebelum melakukan apapun di project ini.
 ---
 
 ## CATATAN TERBARU (2026-05-18)
-Phase 6 selesai: PWA installable, service worker, offline IndexedDB queue (Dexie), auto sync saat online, product cache 500 item, OfflineIndicator di corner kanan bawah.
+Google Sheets sync via Supabase Edge Function sync-sheets. Tombol ada di halaman Laporan. Secrets: GOOGLE_SERVICE_ACCOUNT + SPREADSHEET_ID=1Hiqb0qfZBcC8vYK2CU3vqIyHN2uvDZIUG1VLkyZTx9s di Supabase Edge Function secrets.
 
 ---
 
