@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate, Outlet } from "@tanstack/react-router";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   Package,
