@@ -121,7 +121,11 @@ serve(async (req) => {
     const token = await getGoogleTokenDirect(clientEmail, privateKey);
     console.log("Token ok:", !!token);
 
-    const { type } = await req.json().catch(() => ({ type: "sales" }));
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch(e) { console.log("Body parse error:", e); }
+    console.log("Body keys:", Object.keys(body).join(","));
+    const isWebhook = !!body.record;
+    const type = isWebhook ? "sales" : ((body.type as string) ?? "sales");
 
     if (type === "sales" || type === "all") {
       const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
@@ -133,17 +137,18 @@ serve(async (req) => {
       const { data: sales, error: salesError } = await supabase
         .from("sales_headers")
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
-        .gte("created_at", yesterday)
+        .gte("created_at", isWebhook ? new Date(Date.now() - 60000).toISOString() : yesterday)
         .is("deleted_at", null)
         .neq("transaction_status", "VOID");
       console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
-        rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
+        if (!isWebhook) rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
         for (const s of sales as Record<string, unknown>[]) {
           const dt = new Date((s.transaction_date ?? s.created_at) as string);
-          const tgl = dt.toLocaleDateString("id-ID");
-          const jam = dt.toLocaleTimeString("id-ID");
+          const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
+          const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
+          const jam = wib.toISOString().split("T")[1].substring(0, 8);
           const kasir = userMap[s.cashier_id as string] ?? (s.cashier_id as string)?.substring(0,8) ?? "-";
           const customer = (s.customer as Record<string,unknown>)?.customer_name ?? "Umum/Walk-in";
           const details = (s.sales_details as Record<string,unknown>[]) ?? [];
@@ -157,22 +162,35 @@ serve(async (req) => {
             const qty = d ? Number(d.qty ?? 0) : 0;
             const satuan = d ? (d.unit_name ?? "-") : "-";
             rows.push([
-              idx===0 ? s.sales_number : "",
-              idx===0 ? tgl : "",
-              idx===0 ? jam : "",
-              idx===0 ? kasir : "",
-              idx===0 ? customer : "",
+              s.sales_number,
+              tgl,
+              jam,
+              kasir,
+              customer,
               produk, qty, satuan, harga, harga*qty,
-              idx===0 ? discPct : "",
-              idx===0 ? grandTotal : "",
-              idx===0 ? s.payment_method : "",
-              idx===0 ? s.payment_amount : "",
-              idx===0 ? s.change_amount : "",
-              idx===0 ? s.transaction_status : ""
+              discPct,
+              grandTotal,
+              s.payment_method,
+              s.payment_amount,
+              s.change_amount,
+              s.transaction_status
             ]);
           });
         }
-        const sheetResult = await appendToSheet(token, spreadsheetId, "Penjualan!A1", rows);
+        let sheetResult;
+        if (isWebhook) {
+          // Webhook: append saja baris baru (tanpa header row)
+          const dataRows = rows.slice(1); // skip header
+          sheetResult = await appendToSheet(token, spreadsheetId, "Penjualan!A1", dataRows);
+        } else {
+          // Manual: overwrite semua dari A1
+          const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Penjualan!A1?valueInputOption=RAW`, {
+            method: "PUT",
+            headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ range: "Penjualan!A1", majorDimension: "ROWS", values: rows }),
+          });
+          sheetResult = await updateRes.json();
+        }
         console.log("Sheet write result:", JSON.stringify(sheetResult));
       }
     }
