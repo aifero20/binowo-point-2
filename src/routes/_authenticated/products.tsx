@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Package2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package2, Tag } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
@@ -140,6 +140,7 @@ function ProductsPage() {
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(p); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" title="Satuan" onClick={() => setUnitDialog(p.id)}><Package2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" title="Diskon" onClick={() => setDiscountDialog(p.id)}><Tag className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => { if (confirm("Hapus barang?")) del.mutate(p.id); }}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </TableCell>
