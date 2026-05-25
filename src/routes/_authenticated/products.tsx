@@ -233,3 +233,4 @@ function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Produ
     </DialogContent>
   );
 }
+
