@@ -35,6 +35,11 @@ function SalesPOS() {
   const [customerId, setCustomerId] = useState<string>("none");
   const [headerDiscount, setHeaderDiscount] = useState(0);
 
+  const selectedCustomerType = useMemo(() => {
+    if (customerId === "none") return "RETAIL";
+    return (customers.find((c) => c.id === customerId) as Record<string, unknown>)?.customer_type as string ?? "RETAIL";
+  }, [customerId, customers]);
+
   // Re-apply diskon saat customer berubah
   useEffect(() => {
     if (!productDiscountMap) return;
