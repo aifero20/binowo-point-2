@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/customers")({
   component: CustomersPage,
 });
 
-type Customer = { id: string; customer_code: string; customer_name: string; phone: string | null; city: string | null };
+type Customer = { id: string; customer_code: string; customer_name: string; phone: string | null; city: string | null; customer_type: string };
 
 function CustomersPage() {
   const qc = useQueryClient();
@@ -74,6 +74,7 @@ function CustomersPage() {
                 <TableCell className="font-medium">{c.customer_name}</TableCell>
                 <TableCell>{c.city ?? "-"}</TableCell>
                 <TableCell>{c.phone ?? "-"}</TableCell>
+                <TableCell><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.customer_type === "GROSIR" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>{c.customer_type ?? "RETAIL"}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
@@ -90,7 +91,7 @@ function CustomersPage() {
 }
 
 function CustomerForm({ editing, onSubmit, loading }: { editing: Customer | null; onSubmit: (f: Partial<Customer>) => void; loading: boolean }) {
-  const [form, setForm] = useState<Partial<Customer>>(editing ?? { customer_code: "", customer_name: "", city: "", phone: "" });
+  const [form, setForm] = useState<Partial<Customer>>(editing ?? { customer_code: "", customer_name: "", city: "", phone: "", customer_type: "RETAIL" });
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Customer" : "Tambah Customer"}</DialogTitle></DialogHeader>
@@ -100,6 +101,7 @@ function CustomerForm({ editing, onSubmit, loading }: { editing: Customer | null
           <div className="space-y-1.5"><Label>Nama *</Label><Input required value={form.customer_name ?? ""} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Kota</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Telepon</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+          <div className="space-y-1.5 col-span-2"><Label>Tipe Customer</Label><select value={form.customer_type ?? "RETAIL"} onChange={(e) => setForm({ ...form, customer_type: e.target.value })} className="w-full h-9 border rounded-md px-3 text-sm bg-background"><option value="RETAIL">RETAIL</option><option value="GROSIR">GROSIR</option></select></div>
         </div>
         <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan"}</Button></DialogFooter>
       </form>

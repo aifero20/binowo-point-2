@@ -137,13 +137,13 @@ serve(async (req) => {
       const { data: sales, error: salesError } = await supabase
         .from("sales_headers")
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
-        .gte("created_at", isWebhook ? new Date(Date.now() - 60000).toISOString() : yesterday)
+        .gte("created_at", yesterday)
         .is("deleted_at", null)
         .neq("transaction_status", "VOID");
       console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
-        if (!isWebhook) rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
+        rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
         for (const s of sales as Record<string, unknown>[]) {
           const dt = new Date((s.transaction_date ?? s.created_at) as string);
           const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
@@ -177,20 +177,13 @@ serve(async (req) => {
             ]);
           });
         }
-        let sheetResult;
-        if (isWebhook) {
-          // Webhook: append saja baris baru (tanpa header row)
-          const dataRows = rows.slice(1); // skip header
-          sheetResult = await appendToSheet(token, spreadsheetId, "Penjualan!A1", dataRows);
-        } else {
-          // Manual: overwrite semua dari A1
-          const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Penjualan!A1?valueInputOption=RAW`, {
-            method: "PUT",
-            headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ range: "Penjualan!A1", majorDimension: "ROWS", values: rows }),
-          });
-          sheetResult = await updateRes.json();
-        }
+        // Selalu overwrite dari A1
+        const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Penjualan!A1?valueInputOption=RAW`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ range: "Penjualan!A1", majorDimension: "ROWS", values: rows }),
+        });
+        const sheetResult = await updateRes.json();
         console.log("Sheet write result:", JSON.stringify(sheetResult));
       }
     }

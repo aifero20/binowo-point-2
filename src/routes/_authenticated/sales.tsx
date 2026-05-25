@@ -20,7 +20,7 @@ import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
-type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number };
+type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number; discountType?: "per_pcs" | "per_total" };
 
 function SalesPOS() {
   const { user } = useAuth();
@@ -34,6 +34,15 @@ function SalesPOS() {
   const [offlineMode, setOfflineMode] = useState(!isOnline());
   const [customerId, setCustomerId] = useState<string>("none");
   const [headerDiscount, setHeaderDiscount] = useState(0);
+
+  // Re-apply diskon saat customer berubah
+  useEffect(() => {
+    if (!productDiscountMap) return;
+    setCart((c) => c.map((item) => {
+      const discPct = productDiscountMap?.[item.product_id]?.[selectedCustomerType] ?? 0;
+      return { ...item, discount: discPct };
+    }));
+  }, [selectedCustomerType, productDiscountMap]);
   const [activeTab, setActiveTab] = useState("pos");
 
   useEffect(() => {
@@ -68,6 +77,19 @@ function SalesPOS() {
     },
   });
 
+  const { data: productDiscountMap } = useQuery({
+    queryKey: ["product-discounts-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_discounts").select("product_id, customer_type, discount_pct");
+      const map: Record<string, Record<string, number>> = {};
+      (data ?? []).forEach((d) => {
+        if (!map[d.product_id]) map[d.product_id] = {};
+        map[d.product_id][d.customer_type] = d.discount_pct;
+      });
+      return map;
+    },
+  });
+
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
@@ -98,7 +120,16 @@ function SalesPOS() {
     staleTime: 0,
   });
 
-  const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
+  const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => {
+    const gross = l.qty * l.selling_price;
+    const disc = l.discount ?? 0;
+    if (!disc) return s + gross;
+    if ((l.discountType ?? "per_pcs") === "per_pcs") {
+      return s + l.qty * l.selling_price * (1 - disc / 100);
+    } else {
+      return s + gross * (1 - disc / 100);
+    }
+  }, 0), [cart]);
   useEffect(() => {
     if (warehouses.length > 0 && !warehouseId) {
       const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];

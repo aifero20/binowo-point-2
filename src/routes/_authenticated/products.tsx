@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,7 @@ function ProductsPage() {
   });
 
   const [unitDialog, setUnitDialog] = useState<string | null>(null);
+  const [discountDialog, setDiscountDialog] = useState<string | null>(null);
   const [unitForm, setUnitForm] = useState({ unit_name: "", conversion_qty: 1, retail_price: 0, wholesale_price: 0 });
 
   const { data: units = [] } = useQuery({
@@ -155,6 +156,29 @@ function ProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    {/* Dialog Diskon */}
+    <Dialog open={!!discountDialog} onOpenChange={(o) => !o && setDiscountDialog(null)}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Kelola Diskon Per Tipe Customer</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-2">
+          {["RETAIL", "GROSIR"].map((type) => {
+            const existing = productDiscounts.find((d: Record<string, unknown>) => d.customer_type === type);
+            const [val, setVal] = React.useState(existing ? String(existing.discount_pct) : "0");
+            React.useEffect(() => { setVal(existing ? String(existing.discount_pct) : "0"); }, [existing]);
+            return (
+              <div key={type} className="flex items-center gap-3">
+                <span className={`text-sm font-medium w-16 px-2 py-1 rounded-full text-center ${type === "GROSIR" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>{type}</span>
+                <div className="flex items-center gap-2 flex-1">
+                  <Input type="number" min={0} max={100} value={val} onChange={(e) => setVal(e.target.value)} className="w-24 h-8" placeholder="0" />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <Button size="sm" onClick={() => saveDiscount.mutate({ customer_type: type, discount_pct: Number(val) })} disabled={saveDiscount.isPending}>Simpan</Button>
+              </div>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }
