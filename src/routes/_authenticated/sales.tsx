@@ -88,13 +88,14 @@ function SalesPOS() {
     },
   });
 
-  const { data: recentSales = [] } = useQuery({
+  const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
     queryKey: ["recent-sales"],
     queryFn: async () => {
       const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at").is("deleted_at", null).order("created_at", { ascending: false }).limit(20);
       if (error) throw error;
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
@@ -179,7 +180,7 @@ function SalesPOS() {
 
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === "history") refetchRecentSales(); }}>
         <TabsList><TabsTrigger value="pos">POS Kasir</TabsTrigger><TabsTrigger value="held">Hold ({heldTransactions.length})</TabsTrigger><TabsTrigger value="history">Riwayat</TabsTrigger></TabsList>
 
         <TabsContent value="pos">
