@@ -154,7 +154,7 @@ function SalesPOS() {
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
     },
-    onSuccess: () => { toast.success("Transaksi di-hold"); setCart([]); setPaymentAmount(0); qc.invalidateQueries({ queryKey: ["held-sales"] }); },
+    onSuccess: () => { toast.success("Transaksi di-hold"); setCart([]); setPaymentAmount(0); qc.invalidateQueries({ queryKey: ["held-sales"] }); qc.invalidateQueries({ queryKey: ["recent-sales"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -165,7 +165,7 @@ function SalesPOS() {
       if (error) throw error;
       return (details ?? []).map((d: { product_id: string; qty: number; unit_name: string; selling_price: number; products: { product_name: string } | null }) => ({ product_id: d.product_id, product_name: d.products?.product_name ?? "-", unit_name: d.unit_name, qty: Number(d.qty), selling_price: Number(d.selling_price) }));
     },
-    onSuccess: (items) => { setCart(items); setActiveTab("pos"); toast.success("Transaksi dilanjutkan"); qc.invalidateQueries({ queryKey: ["held-sales"] }); },
+    onSuccess: (items) => { setCart(items); setActiveTab("pos"); toast.success("Transaksi dilanjutkan"); qc.invalidateQueries({ queryKey: ["held-sales"] }); qc.invalidateQueries({ queryKey: ["recent-sales"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
