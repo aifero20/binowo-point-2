@@ -33,6 +33,8 @@ function SalesPOS() {
   const [voidDialog, setVoidDialog] = useState<string | null>(null);
   const [offlineMode, setOfflineMode] = useState(!isOnline());
   const [customerId, setCustomerId] = useState<string>("none");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerOpen, setCustomerOpen] = useState(false);
   const [headerDiscount, setHeaderDiscount] = useState(0);
 
   const [activeTab, setActiveTab] = useState("pos");
@@ -284,13 +286,32 @@ function SalesPOS() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
                     <Label>Customer</Label>
-                    <Select value={customerId} onValueChange={setCustomerId}>
-                      <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Umum / Walk-in</SelectItem>
-                        {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+<div className="relative">
+                      <input
+                        type="text"
+                        className="w-full h-9 border rounded-md px-3 text-sm bg-background"
+                        placeholder="Umum / Walk-in"
+                        value={customerSearch}
+                        onChange={(e) => { setCustomerSearch(e.target.value); setCustomerOpen(true); }}
+                        onFocus={() => setCustomerOpen(true)}
+                        onBlur={() => setTimeout(() => setCustomerOpen(false), 150)}
+                      />
+                      {customerOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-md max-h-[180px] overflow-y-auto">
+                          <div
+                            className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                            onMouseDown={() => { setCustomerId("none"); setCustomerSearch(""); setCustomerOpen(false); }}
+                          >Umum / Walk-in</div>
+                          {customers.filter((c) => c.customer_name.toLowerCase().includes(customerSearch.toLowerCase())).map((c) => (
+                            <div
+                              key={c.id}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                              onMouseDown={() => { setCustomerId(c.id); setCustomerSearch(c.customer_name); setCustomerOpen(false); }}
+                            >{c.customer_name}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Diskon Header (%)</Label>
