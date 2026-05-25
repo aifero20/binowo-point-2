@@ -140,6 +140,12 @@ function SalesPOS() {
       setCustomerId("none");
       setHeaderDiscount(0);
       qc.invalidateQueries();
+      // Auto sync ke Google Sheets
+      fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ type: "sales" }),
+      }).catch(() => {});
     },
     onError: (e: Error) => toast.error(e.message),
   });
