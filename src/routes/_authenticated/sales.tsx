@@ -17,7 +17,6 @@ import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
 import { isOnline, saveOfflineSale, syncPendingSales } from "@/lib/offline-sync";
 import { db } from "@/lib/db";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
