@@ -55,6 +55,28 @@ function ProductsPage() {
 
   const [unitDialog, setUnitDialog] = useState<string | null>(null);
   const [discountDialog, setDiscountDialog] = useState<string | null>(null);
+
+  const { data: productDiscounts = [] } = useQuery({
+    queryKey: ["product-discounts", discountDialog],
+    queryFn: async () => {
+      if (!discountDialog) return [];
+      const { data } = await supabase.from("product_discounts").select("*").eq("product_id", discountDialog);
+      return data ?? [];
+    },
+    enabled: !!discountDialog,
+  });
+
+  const saveDiscount = useMutation({
+    mutationFn: async ({ customer_type, discount_pct }: { customer_type: string; discount_pct: number }) => {
+      const { error } = await supabase.from("product_discounts").upsert(
+        { product_id: discountDialog!, customer_type, discount_pct },
+        { onConflict: "product_id,customer_type" }
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Diskon disimpan"); qc.invalidateQueries({ queryKey: ["product-discounts"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const [unitForm, setUnitForm] = useState({ unit_name: "", conversion_qty: 1, retail_price: 0, wholesale_price: 0 });
 
   const { data: units = [] } = useQuery({
