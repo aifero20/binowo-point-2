@@ -125,7 +125,7 @@ function SalesPOS() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
       const sales_number = "SO" + Date.now();
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
@@ -149,7 +149,7 @@ function SalesPOS() {
       if (cart.length === 0) throw new Error("Keranjang kosong");
       if (!warehouseId) throw new Error("Pilih gudang");
       const sales_number = "HOLD" + Date.now();
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, cashier_id: user!.id, subtotal, grand_total: subtotal, payment_method: paymentMethod, transaction_status: "HOLD", hold_status: true } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), cashier_id: user!.id, subtotal, grand_total: subtotal, payment_method: paymentMethod, transaction_status: "HOLD", hold_status: true } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);

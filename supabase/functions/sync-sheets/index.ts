@@ -76,15 +76,15 @@ serve(async (req) => {
       const today = new Date().toISOString().split("T")[0];
       const { data: sales } = await supabase
         .from("sales_headers")
-        .select("sales_number, transaction_date, grand_total, payment_method, transaction_status")
-        .gte("transaction_date", today)
+        .select("sales_number, transaction_date, created_at, grand_total, payment_method, transaction_status")
+        .gte("created_at", today)
         .is("deleted_at", null)
         .neq("transaction_status", "VOID");
 
       if (sales && sales.length > 0) {
         const rows = sales.map((s: Record<string, unknown>) => [
           s.sales_number,
-          new Date(s.transaction_date as string).toLocaleString("id-ID"),
+          new Date((s.transaction_date ?? s.created_at) as string).toLocaleString("id-ID"),
           s.grand_total,
           s.payment_method,
           s.transaction_status,
@@ -97,14 +97,14 @@ serve(async (req) => {
       const today = new Date().toISOString().split("T")[0];
       const { data: purchases } = await supabase
         .from("purchase_headers")
-        .select("purchase_number, transaction_date, grand_total, payment_status")
-        .gte("transaction_date", today)
+        .select("purchase_number, transaction_date, created_at, grand_total, payment_status")
+        .gte("created_at", today)
         .is("deleted_at", null);
 
       if (purchases && purchases.length > 0) {
         const rows = purchases.map((p: Record<string, unknown>) => [
           p.purchase_number,
-          p.transaction_date,
+          new Date((p.transaction_date ?? p.created_at) as string).toLocaleString("id-ID"),
           p.grand_total,
           p.payment_status,
         ]);
