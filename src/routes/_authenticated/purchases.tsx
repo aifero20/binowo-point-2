@@ -27,6 +27,7 @@ function PurchasesPage() {
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("LUNAS");
   const [searchProduct, setSearchProduct] = useState("");
 
   const { data: headers = [] } = useQuery({
@@ -42,6 +43,13 @@ function PurchasesPage() {
     queryKey: ["suppliers-list"],
     queryFn: async () => { const { data } = await supabase.from("suppliers").select("id, supplier_name").is("deleted_at", null).order("supplier_name"); return data ?? []; },
   });
+
+  useEffect(() => {
+    if (warehouses.length > 0 && !warehouseId) {
+      const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
+      setWarehouseId(utama.id);
+    }
+  }, [warehouses]);
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
