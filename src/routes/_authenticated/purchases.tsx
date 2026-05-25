@@ -44,17 +44,16 @@ function PurchasesPage() {
     queryFn: async () => { const { data } = await supabase.from("suppliers").select("id, supplier_name").is("deleted_at", null).order("supplier_name"); return data ?? []; },
   });
 
+  const { data: warehouses = [] } = useQuery({
+    queryKey: ["warehouses-active"],
+    queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
+  });
   useEffect(() => {
     if (warehouses.length > 0 && !warehouseId) {
       const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
       setWarehouseId(utama.id);
     }
   }, [warehouses]);
-
-  const { data: warehouses = [] } = useQuery({
-    queryKey: ["warehouses-active"],
-    queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
-  });
 
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", searchProduct],
