@@ -35,14 +35,6 @@ function SalesPOS() {
   const [customerId, setCustomerId] = useState<string>("none");
   const [headerDiscount, setHeaderDiscount] = useState(0);
 
-  // Re-apply diskon saat customer berubah
-  useEffect(() => {
-    if (!productDiscountMap) return;
-    setCart((c) => c.map((item) => {
-      const discPct = productDiscountMap?.[item.product_id]?.[selectedCustomerType] ?? 0;
-      return { ...item, discount: discPct };
-    }));
-  }, [selectedCustomerType, productDiscountMap]);
   const [activeTab, setActiveTab] = useState("pos");
 
   useEffect(() => {
@@ -124,6 +116,15 @@ function SalesPOS() {
     if (customerId === "none") return "RETAIL";
     return (customers.find((c) => c.id === customerId) as Record<string, unknown>)?.customer_type as string ?? "RETAIL";
   }, [customerId, customers]);
+
+  // Re-apply diskon saat customer berubah
+  useEffect(() => {
+    if (!productDiscountMap) return;
+    setCart((c) => c.map((item) => {
+      const discPct = productDiscountMap?.[item.product_id]?.[selectedCustomerType] ?? 0;
+      return { ...item, discount: discPct };
+    }));
+  }, [selectedCustomerType, productDiscountMap]);
 
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => {
     const gross = l.qty * l.selling_price;
