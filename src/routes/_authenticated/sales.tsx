@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,7 @@ function SalesPOS() {
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
+
   });
 
   const { data: customers = [] } = useQuery({
@@ -97,6 +98,13 @@ function SalesPOS() {
   });
 
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => s + l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100), 0), [cart]);
+  useEffect(() => {
+    if (warehouses.length > 0 && !warehouseId) {
+      const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
+      setWarehouseId(utama.id);
+    }
+  }, [warehouses]);
+
   const subtotal = useMemo(() => subtotalBeforeDiscount * (1 - headerDiscount / 100), [subtotalBeforeDiscount, headerDiscount]);
   const change = paymentAmount - subtotal;
 
