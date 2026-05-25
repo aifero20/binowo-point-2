@@ -70,6 +70,7 @@ function WarehousesPage() {
 
 function WarehouseForm({ editing, onSubmit, loading }: { editing: Warehouse | null; onSubmit: (f: Partial<Warehouse>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Warehouse>>(editing ?? { warehouse_code: "", warehouse_name: "", is_active: true });
+  React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Gudang" : "Tambah Gudang"}</DialogTitle></DialogHeader>

@@ -208,6 +208,7 @@ function ProductsPage() {
 
 function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Product | null; suppliers: { id: string; supplier_name: string }[]; onSubmit: (f: Partial<Product>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Product>>(editing ?? { product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, supplier_id: null });
+  React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
   const n = (v: string) => Number(v) || 0;
   return (
     <DialogContent className="max-w-lg">
