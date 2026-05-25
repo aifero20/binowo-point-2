@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,7 +92,7 @@ function CustomersPage() {
 
 function CustomerForm({ editing, onSubmit, loading }: { editing: Customer | null; onSubmit: (f: Partial<Customer>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Customer>>(editing ?? { customer_code: "", customer_name: "", city: "", phone: "", customer_type: "RETAIL" });
-  React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
+  useEffect(() => { setForm(editing ?? {}); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Customer" : "Tambah Customer"}</DialogTitle></DialogHeader>

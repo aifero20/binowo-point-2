@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +88,7 @@ function SuppliersPage() {
 
 function SupplierForm({ editing, onSubmit, loading }: { editing: Supplier | null; onSubmit: (f: Partial<Supplier>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Supplier>>(editing ?? { supplier_code: "", supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" });
-  React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
+  useEffect(() => { setForm(editing ?? {}); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Supplier" : "Tambah Supplier"}</DialogTitle></DialogHeader>

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +70,7 @@ function WarehousesPage() {
 
 function WarehouseForm({ editing, onSubmit, loading }: { editing: Warehouse | null; onSubmit: (f: Partial<Warehouse>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Warehouse>>(editing ?? { warehouse_code: "", warehouse_name: "", is_active: true });
-  React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
+  useEffect(() => { setForm(editing ?? {}); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Gudang" : "Tambah Gudang"}</DialogTitle></DialogHeader>
