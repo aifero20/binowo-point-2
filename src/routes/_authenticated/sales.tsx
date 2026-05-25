@@ -34,6 +34,7 @@ function SalesPOS() {
   const [offlineMode, setOfflineMode] = useState(!isOnline());
   const [customerId, setCustomerId] = useState<string>("none");
   const [headerDiscount, setHeaderDiscount] = useState(0);
+  const [activeTab, setActiveTab] = useState("pos");
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -163,7 +164,7 @@ function SalesPOS() {
       if (error) throw error;
       return (details ?? []).map((d: { product_id: string; qty: number; unit_name: string; selling_price: number; products: { product_name: string } | null }) => ({ product_id: d.product_id, product_name: d.products?.product_name ?? "-", unit_name: d.unit_name, qty: Number(d.qty), selling_price: Number(d.selling_price) }));
     },
-    onSuccess: (items) => { setCart(items); toast.success("Transaksi dilanjutkan"); qc.invalidateQueries({ queryKey: ["held-sales"] }); },
+    onSuccess: (items) => { setCart(items); setActiveTab("pos"); toast.success("Transaksi dilanjutkan"); qc.invalidateQueries({ queryKey: ["held-sales"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -178,7 +179,7 @@ function SalesPOS() {
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="pos">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList><TabsTrigger value="pos">POS Kasir</TabsTrigger><TabsTrigger value="held">Hold ({heldTransactions.length})</TabsTrigger><TabsTrigger value="history">Riwayat</TabsTrigger></TabsList>
 
         <TabsContent value="pos">
