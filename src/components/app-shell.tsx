@@ -1,51 +1,34 @@
 import { Link, useLocation, useNavigate, Outlet } from "@tanstack/react-router";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  LayoutDashboard,
-  Package,
-  Users,
-  Truck,
-  Warehouse as WarehouseIcon,
-  ShoppingCart,
-  ShoppingBag,
-  Clock,
-  RotateCcw,
-  ArrowRightLeft,
-  BarChart2,
-  SlidersHorizontal,
-  UserCog,
-  History,
-  Package2,
-  Banknote,
-  ScrollText,
-  ShieldCheck,
-  ArrowLeftRight,
-  LogOut,
-  Store,
-  Menu,
+  LayoutDashboard, Users, Truck, Warehouse as WarehouseIcon,
+  ShoppingCart, ShoppingBag, Clock, RotateCcw, BarChart2,
+  UserCog, Package2, Banknote, ScrollText, ShieldCheck,
+  LogOut, Store, Menu,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/shifts", label: "Shift Kasir", icon: Clock },
-  { to: "/sales", label: "Penjualan (POS)", icon: ShoppingCart },
-  { to: "/customers", label: "Customer", icon: Users },
-  { to: "/returns", label: "Retur", icon: RotateCcw },
-  { to: "/purchases", label: "Pembelian", icon: ShoppingBag },
-  { to: "/suppliers", label: "Supplier", icon: Truck },
-  { to: "/debts", label: "Hutang Supplier", icon: Banknote },
-  { to: "/master-inventory", label: "Master Barang", icon: Package2 },
-  { to: "/warehouses", label: "Gudang", icon: WarehouseIcon },
-  { to: "/reports", label: "Laporan", icon: BarChart2 },
-  { to: "/users", label: "Manajemen User", icon: UserCog },
-  { to: "/activity-logs", label: "Activity Log", icon: ScrollText },
-  { to: "/permissions", label: "Permission Matrix", icon: ShieldCheck },
+  { to: "/dashboard",       label: "Dashboard",        icon: LayoutDashboard, menu_code: "DASHBOARD" },
+  { to: "/shifts",          label: "Shift Kasir",       icon: Clock,           menu_code: "SHIFT_KASIR" },
+  { to: "/sales",           label: "Penjualan (POS)",   icon: ShoppingCart,    menu_code: "PENJUALAN" },
+  { to: "/customers",       label: "Customer",          icon: Users,           menu_code: "CUSTOMER" },
+  { to: "/returns",         label: "Retur",             icon: RotateCcw,       menu_code: "RETUR" },
+  { to: "/purchases",       label: "Pembelian",         icon: ShoppingBag,     menu_code: "PEMBELIAN" },
+  { to: "/suppliers",       label: "Supplier",          icon: Truck,           menu_code: "SUPPLIER" },
+  { to: "/debts",           label: "Hutang Supplier",   icon: Banknote,        menu_code: "HUTANG_SUPPLIER" },
+  { to: "/master-inventory",label: "Master Barang",     icon: Package2,        menu_code: "MASTER_BARANG" },
+  { to: "/warehouses",      label: "Gudang",            icon: WarehouseIcon,   menu_code: "GUDANG" },
+  { to: "/reports",         label: "Laporan",           icon: BarChart2,       menu_code: "LAPORAN" },
+  { to: "/users",           label: "Manajemen User",    icon: UserCog,         menu_code: "MANAJEMEN_USER" },
+  { to: "/activity-logs",   label: "Activity Log",      icon: ScrollText,      menu_code: "ACTIVITY_LOG" },
+  { to: "/permissions",     label: "Permission Matrix", icon: ShieldCheck,     menu_code: "PERMISSION_MATRIX" },
 ] as const;
 
 export function AppShell() {
@@ -54,6 +37,26 @@ export function AppShell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
+  const roleCode = roles[0]?.toUpperCase() ?? "";
+
+  const { data: allowedMenus = null } = useQuery({
+    queryKey: ["role_permissions", roleCode],
+    enabled: !!roleCode,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("role_permissions")
+        .select("permissions(menu_code)")
+        .eq("role_code", roleCode)
+        .eq("is_active", true);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => r.permissions?.menu_code).filter(Boolean) as string[];
+    },
+  });
+
+  const visibleNav = allowedMenus === null
+    ? NAV
+    : NAV.filter(item => allowedMenus.includes(item.menu_code));
+
   async function handleSignOut() {
     await signOut();
     navigate({ to: "/login" });
@@ -61,7 +64,6 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground flex flex-col transition-transform md:translate-x-0",
@@ -78,7 +80,7 @@ export function AppShell() {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-3">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
             const Icon = item.icon;
             return (
@@ -102,7 +104,7 @@ export function AppShell() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <div className="text-xs opacity-75">
             <p className="font-medium truncate">{user?.email}</p>
-            <p>{roles.join(", ") || "—"}</p>
+            <p>{roleCode || "—"}</p>
           </div>
           <Button variant="secondary" size="sm" className="w-full" onClick={handleSignOut}>
             <LogOut className="h-4 w-4 mr-2" />
@@ -110,8 +112,6 @@ export function AppShell() {
           </Button>
         </div>
       </aside>
-
-      {/* Main */}
       <div className="flex-1 md:ml-64 flex flex-col min-w-0">
         <header className="h-16 border-b bg-card px-4 md:px-6 flex items-center gap-3 sticky top-0 z-30">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen((o) => !o)}>
@@ -123,7 +123,7 @@ export function AppShell() {
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
-      <OfflineIndicator />
+          <OfflineIndicator />
         </main>
       </div>
     </div>
