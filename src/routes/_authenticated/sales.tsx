@@ -98,7 +98,7 @@ function SalesPOS() {
   const { data: heldTransactions = [] } = useQuery({
     queryKey: ["held-sales"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, created_at").eq("hold_status", true).is("deleted_at", null).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, created_at, customers(customer_name), sales_details(qty, unit_name, products(product_name))").eq("hold_status", true).is("deleted_at", null).order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -380,13 +380,20 @@ function SalesPOS() {
         <TabsContent value="held">
           <Card><CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="w-32" /></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="w-32" /></TableRow></TableHeader>
               <TableBody>
-                {heldTransactions.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Tidak ada transaksi hold.</TableCell></TableRow>}
+                {heldTransactions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Tidak ada transaksi hold.</TableCell></TableRow>}
                 {heldTransactions.map((h) => (
                   <TableRow key={h.id}>
                     <TableCell className="font-mono text-xs">{h.sales_number}</TableCell>
                     <TableCell className="text-xs">{new Date(h.created_at).toLocaleString("id-ID")}</TableCell>
+                    <TableCell className="text-sm">{(h as any).customers?.customer_name ?? <span className="text-muted-foreground text-xs">Umum</span>}</TableCell>
+                    <TableCell className="text-xs max-w-[200px]">
+                      {((h as any).sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty}</span></div>
+                      ))}
+                      {((h as any).sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{((h as any).sales_details ?? []).length - 3} lainnya</div>}
+                    </TableCell>
                     <TableCell className="text-right font-medium">{formatRp(h.grand_total)}</TableCell>
                     <TableCell>
                       <Button size="sm" className="gap-1" onClick={() => resumeHold.mutate(h.id)} disabled={resumeHold.isPending}>
