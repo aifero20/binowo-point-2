@@ -97,7 +97,7 @@ function ReturnsPage() {
       if (srLines.length === 0) throw new Error("Tambah item dulu");
       const return_number = "RSL" + Date.now();
       const grand_total = srLines.reduce((s, l) => s + l.qty * l.buy_price, 0);
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number: return_number, cashier_id: user!.id, subtotal: grand_total, grand_total, payment_method: "RETUR", transaction_status: "VOID", hold_status: false, customer_id: srCustomerId || null } as never).select("id").single();
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number: return_number, cashier_id: user!.id, subtotal: grand_total, grand_total, payment_method: "RETUR", transaction_status: "VOID", hold_status: false, customer_id: srCustomerId && srCustomerId !== "none" ? srCustomerId : null } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(srLines.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: srWarehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.buy_price, total: l.qty * l.buy_price })) as never);
@@ -216,7 +216,7 @@ function ReturnsPage() {
         <TabsContent value="penjualan">
           <div className="flex justify-end mb-3">
             <Dialog open={openSalesReturn} onOpenChange={setOpenSalesReturn}>
-              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur Penjualan</Button></DialogTrigger>
+              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur</Button></DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Retur Penjualan</DialogTitle></DialogHeader>
                 <div className="grid md:grid-cols-2 gap-4">
@@ -231,7 +231,7 @@ function ReturnsPage() {
                       <Select value={srCustomerId} onValueChange={setSrCustomerId}>
                         <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Umum / Walk-in</SelectItem>
+                          <SelectItem value="none">Umum / Walk-in</SelectItem>
                           {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                         </SelectContent>
                       </Select>
