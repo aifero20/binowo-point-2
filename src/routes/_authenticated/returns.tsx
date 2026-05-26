@@ -144,9 +144,10 @@ function ReturnsPage() {
   return (
     <div className="space-y-4">
       <Tabs defaultValue="pembelian">
-        <TabsList><TabsTrigger value="pembelian">Retur Pembelian</TabsTrigger><TabsTrigger value="penjualan">Retur Penjualan</TabsTrigger></TabsList>
         <TabsContent value="pembelian">
-      <div className="flex justify-end">
+          <div className="flex items-center justify-between mb-4">
+            <TabsList><TabsTrigger value="pembelian">Retur Pembelian</TabsTrigger><TabsTrigger value="penjualan">Retur Penjualan</TabsTrigger></TabsList>
+            <div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur</Button></DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -198,8 +199,9 @@ function ReturnsPage() {
             <DialogFooter><Button size="lg" onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Menyimpan..." : "Simpan Retur"}</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-      <Card><CardContent className="p-0">
+            </div>
+          </div>
+          <Card><CardContent className="p-0">
         <Table>
           <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -223,7 +225,9 @@ function ReturnsPage() {
       </CardContent></Card>
         </TabsContent>
         <TabsContent value="penjualan">
-          <div className="flex justify-end mb-3">
+          <div className="flex items-center justify-between mb-4">
+            <TabsList><TabsTrigger value="pembelian">Retur Pembelian</TabsTrigger><TabsTrigger value="penjualan">Retur Penjualan</TabsTrigger></TabsList>
+            <div>
             <Dialog open={openSalesReturn} onOpenChange={setOpenSalesReturn}>
               <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur</Button></DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -278,6 +282,7 @@ function ReturnsPage() {
                 <DialogFooter><Button size="lg" onClick={() => saveSalesReturn.mutate()} disabled={saveSalesReturn.isPending}>{saveSalesReturn.isPending ? "Menyimpan..." : "Simpan Retur"}</Button></DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
           <Card><CardContent className="p-0">
             <Table>
