@@ -32,6 +32,14 @@ function ReturnsPage() {
   const [lines, setLines] = useState<ReturnLine[]>([]);
   const [searchProduct, setSearchProduct] = useState("");
 
+  // Retur Penjualan states
+  const [openSalesReturn, setOpenSalesReturn] = useState(false);
+  const [srCustomerId, setSrCustomerId] = useState("");
+  const [srWarehouseId, setSrWarehouseId] = useState("");
+  const [srNotes, setSrNotes] = useState("");
+  const [srLines, setSrLines] = useState<ReturnLine[]>([]);
+  const [srSearch, setSrSearch] = useState("");
+
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: async () => {
@@ -67,6 +75,36 @@ function ReturnsPage() {
       if (searchProduct) q = q.ilike("product_name", `%${searchProduct}%`);
       const { data } = await q; return data ?? [];
     },
+  });
+
+  const { data: srProducts = [] } = useQuery({
+    queryKey: ["pos-products", srSearch],
+    queryFn: async () => {
+      let q = supabase.from("products").select("id, product_name, default_unit, current_retail_price").is("deleted_at", null).limit(20);
+      if (srSearch) q = q.ilike("product_name", `%${srSearch}%`);
+      const { data } = await q; return data ?? [];
+    },
+  });
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers-list"],
+    queryFn: async () => { const { data } = await supabase.from("customers").select("id, customer_name").is("deleted_at", null).order("customer_name"); return data ?? []; },
+  });
+
+  const saveSalesReturn = useMutation({
+    mutationFn: async () => {
+      if (!srWarehouseId) throw new Error("Pilih gudang");
+      if (srLines.length === 0) throw new Error("Tambah item dulu");
+      const return_number = "RSL" + Date.now();
+      const grand_total = srLines.reduce((s, l) => s + l.qty * l.buy_price, 0);
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number: return_number, cashier_id: user!.id, subtotal: grand_total, grand_total, payment_method: "RETUR", transaction_status: "VOID", hold_status: false, customer_id: srCustomerId || null } as never).select("id").single();
+      if (he) throw he;
+      const sid = (header as { id: string }).id;
+      await supabase.from("sales_details").insert(srLines.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: srWarehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.buy_price, total: l.qty * l.buy_price })) as never);
+      await supabase.from("stock_movements").insert(srLines.map((l) => ({ product_id: l.product_id, warehouse_id: srWarehouseId, transaction_type: "sales_return", reference_number: return_number, qty_in: l.qty, created_by: user!.id })) as never);
+    },
+    onSuccess: () => { toast.success("Retur penjualan disimpan"); qc.invalidateQueries(); setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrWarehouseId(""); setSrNotes(""); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const grandTotal = lines.reduce((s, l) => s + l.qty * l.buy_price, 0);
@@ -154,7 +192,7 @@ function ReturnsPage() {
       </div>
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
           <TableBody>
             {returns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur pembelian.</TableCell></TableRow>}
             {returns.map((r) => (
@@ -176,6 +214,62 @@ function ReturnsPage() {
       </CardContent></Card>
         </TabsContent>
         <TabsContent value="penjualan">
+          <div className="flex justify-end mb-3">
+            <Dialog open={openSalesReturn} onOpenChange={setOpenSalesReturn}>
+              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur Penjualan</Button></DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Retur Penjualan</DialogTitle></DialogHeader>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5"><Label>Gudang *</Label>
+                      <Select value={srWarehouseId} onValueChange={setSrWarehouseId}>
+                        <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
+                        <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5"><Label>Customer</Label>
+                      <Select value={srCustomerId} onValueChange={setSrCustomerId}>
+                        <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Umum / Walk-in</SelectItem>
+                          {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5"><Label>Catatan</Label><Input value={srNotes} onChange={(e) => setSrNotes(e.target.value)} placeholder="Alasan retur..." /></div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Cari Barang</Label>
+                    <Input autoFocus placeholder="Cari nama barang..." value={srSearch} onChange={(e) => setSrSearch(e.target.value)} />
+                    <div className="border rounded max-h-48 overflow-y-auto divide-y">
+                      {srProducts.map((p) => (
+                        <div key={p.id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setSrLines((prev) => prev.find((l) => l.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_retail_price) }])}>
+                          <span>{p.product_name}</span>
+                          <span className="text-muted-foreground text-xs">{formatRp(p.current_retail_price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="border rounded divide-y mt-2">
+                  {srLines.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Belum ada item</p>}
+                  {srLines.map((l, i) => (
+                    <div key={i} className="p-2 grid grid-cols-[1fr_80px_120px_100px_40px] gap-2 items-center text-sm">
+                      <span className="truncate font-medium">{l.product_name}</span>
+                      <Input type="number" min={1} value={l.qty} onChange={(e) => setSrLines((ls) => ls.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="h-8" />
+                      <Input type="number" value={l.buy_price} onChange={(e) => setSrLines((ls) => ls.map((x, j) => j === i ? { ...x, buy_price: Number(e.target.value) } : x))} className="h-8" />
+                      <span className="text-right text-muted-foreground">{formatRp(l.qty * l.buy_price)}</span>
+                      <Button size="icon" variant="ghost" onClick={() => setSrLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between font-bold text-lg border-t pt-3">
+                  <span>Total Retur</span><span className="text-red-500">{formatRp(srLines.reduce((s, l) => s + l.qty * l.buy_price, 0))}</span>
+                </div>
+                <DialogFooter><Button size="lg" onClick={() => saveSalesReturn.mutate()} disabled={saveSalesReturn.isPending}>{saveSalesReturn.isPending ? "Menyimpan..." : "Simpan Retur"}</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <Card><CardContent className="p-0">
             <Table>
               <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Tanggal</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
