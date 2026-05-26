@@ -56,7 +56,9 @@ export function AppShell() {
         .select("menu_code")
         .in("id", ids);
       if (e2) throw e2;
-      return (perms ?? []).map((p: any) => p.menu_code) as string[];
+      const codes = (perms ?? []).map((p: any) => p.menu_code) as string[];
+      console.log("[sidebar] roleCode:", roleCode, "allowedMenus:", codes);
+      return codes;
     },
   });
 
