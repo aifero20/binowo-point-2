@@ -37,7 +37,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const roleCode = roles[0]?.toUpperCase() ?? "";
+  const roleCode = (roles[0] ?? "").toUpperCase();
 
   const { data: allowedMenus = null } = useQuery({
     queryKey: ["role_permissions", roleCode],
@@ -56,9 +56,7 @@ export function AppShell() {
         .select("menu_code")
         .in("id", ids);
       if (e2) throw e2;
-      const codes = (perms ?? []).map((p: any) => p.menu_code) as string[];
-      console.log("[sidebar] roleCode:", roleCode, "allowedMenus:", codes);
-      return codes;
+      return (perms ?? []).map((p: any) => p.menu_code) as string[];
     },
   });
 
