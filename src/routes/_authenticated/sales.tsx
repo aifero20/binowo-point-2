@@ -458,6 +458,7 @@ function SalesPOS() {
               <p className="text-center">Binowo, Balarejo, Kebonsari</p>
               <p className="text-center">Telp / WA : 0813 3113 1048</p>
               <div className="border-t border-dashed my-2" />
+              <p className="text-center text-muted-foreground">{new Date().toLocaleString("id-ID")}</p>
               <div className="flex justify-between"><span>{printData.no}</span><span>{printData.customerName}</span></div>
               <div className="border-t border-dashed my-2" />
               {printData.items.map((item, i) => (
