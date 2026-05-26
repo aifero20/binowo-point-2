@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,15 @@ function ReturnsPage() {
     onSuccess: () => { toast.success("Retur penjualan disimpan"); qc.invalidateQueries(); setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrWarehouseId(""); setSrNotes(""); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // Default gudang utama untuk kedua form
+  useEffect(() => {
+    if (warehouses.length > 0) {
+      const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
+      if (!warehouseId) setWarehouseId(utama.id);
+      if (!srWarehouseId) setSrWarehouseId(utama.id);
+    }
+  }, [warehouses]);
 
   const grandTotal = lines.reduce((s, l) => s + l.qty * l.buy_price, 0);
 
@@ -221,12 +230,6 @@ function ReturnsPage() {
                 <DialogHeader><DialogTitle>Retur Penjualan</DialogTitle></DialogHeader>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-3">
-                    <div className="space-y-1.5"><Label>Gudang *</Label>
-                      <Select value={srWarehouseId} onValueChange={setSrWarehouseId}>
-                        <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
-                        <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
                     <div className="space-y-1.5"><Label>Customer</Label>
                       <Select value={srCustomerId} onValueChange={setSrCustomerId}>
                         <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
@@ -234,6 +237,12 @@ function ReturnsPage() {
                           <SelectItem value="none">Umum / Walk-in</SelectItem>
                           {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                         </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5"><Label>Gudang *</Label>
+                      <Select value={srWarehouseId} onValueChange={setSrWarehouseId}>
+                        <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
+                        <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5"><Label>Catatan</Label><Input value={srNotes} onChange={(e) => setSrNotes(e.target.value)} placeholder="Alasan retur..." /></div>
