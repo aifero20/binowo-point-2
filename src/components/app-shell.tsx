@@ -41,7 +41,7 @@ const NAV = [
   { to: "/warehouses", label: "Gudang", icon: WarehouseIcon },
   { to: "/shifts", label: "Shift Kasir", icon: Clock },
   { to: "/transfers", label: "Transfer Stok", icon: ArrowRightLeft },
-  { to: "/returns", label: "Retur Pembelian", icon: RotateCcw },
+  { to: "/returns", label: "Retur", icon: RotateCcw },
   { to: "/reports", label: "Laporan", icon: BarChart2 },
   { to: "/adjustments", label: "Adjustment Stok", icon: SlidersHorizontal },
   { to: "/users", label: "Manajemen User", icon: UserCog },

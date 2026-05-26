@@ -17,7 +17,8 @@ import { useAuth } from "@/hooks/use-auth";
 export const Route = createFileRoute("/_authenticated/purchases")({ component: PurchasesPage });
 
 type PurchaseLine = { product_id: string; product_name: string; unit_name: string; qty: number; buy_price: number; retail_price: number; wholesale_price: number };
-type PurchaseHeader = { id: string; purchase_number: string; transaction_date: string; grand_total: number; suppliers: { supplier_name: string } | null };
+type PurchaseDetail = { qty: number; unit_name: string; buy_price: number; products: { product_name: string } | null };
+type PurchaseHeader = { id: string; purchase_number: string; transaction_date: string; grand_total: number; suppliers: { supplier_name: string } | null; purchase_details: PurchaseDetail[] };
 
 function PurchasesPage() {
   const { user } = useAuth();
@@ -33,7 +34,7 @@ function PurchasesPage() {
   const { data: headers = [] } = useQuery({
     queryKey: ["purchases"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("purchase_headers").select("id, purchase_number, transaction_date, grand_total, suppliers(supplier_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("purchase_headers").select("id, purchase_number, transaction_date, grand_total, suppliers(supplier_name), purchase_details(qty, unit_name, buy_price, products(product_name))").is("deleted_at", null).order("created_at", { ascending: false }).limit(50);
       if (error) throw error;
       return data as PurchaseHeader[];
     },
@@ -159,14 +160,20 @@ function PurchasesPage() {
       </div>
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>No. PO</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>No. PO</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
           <TableBody>
-            {headers.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Belum ada pembelian.</TableCell></TableRow>}
+            {headers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada pembelian.</TableCell></TableRow>}
             {headers.map((h) => (
               <TableRow key={h.id}>
                 <TableCell className="font-mono text-xs">{h.purchase_number}</TableCell>
-                <TableCell>{new Date(h.transaction_date).toLocaleDateString("id-ID")}</TableCell>
+                <TableCell className="text-xs">{new Date(h.transaction_date).toLocaleDateString("id-ID")}</TableCell>
                 <TableCell>{h.suppliers?.supplier_name ?? "-"}</TableCell>
+                <TableCell className="text-xs max-w-[220px]">
+                  {(h.purchase_details ?? []).slice(0, 3).map((d, i) => (
+                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
+                  ))}
+                  {(h.purchase_details ?? []).length > 3 && <div className="text-muted-foreground">+{(h.purchase_details ?? []).length - 3} lainnya</div>}
+                </TableCell>
                 <TableCell className="text-right font-medium">{formatRp(h.grand_total)}</TableCell>
               </TableRow>
             ))}

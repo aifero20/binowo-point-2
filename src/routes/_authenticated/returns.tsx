@@ -10,14 +10,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/returns")({ component: ReturnsPage });
 
 type ReturnLine = { product_id: string; product_name: string; unit_name: string; qty: number; buy_price: number };
-type ReturnHeader = { id: string; return_number: string; return_date: string; grand_total: number; suppliers: { supplier_name: string } | null };
+type ReturnDetail = { qty: number; unit_name: string; buy_price: number; products: { product_name: string } | null };
+type ReturnHeader = { id: string; return_number: string; return_date: string; grand_total: number; suppliers: { supplier_name: string } | null; purchase_return_details: ReturnDetail[] };
 
 function ReturnsPage() {
   const { user } = useAuth();
@@ -32,9 +35,18 @@ function ReturnsPage() {
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("purchase_returns").select("id, return_number, return_date, grand_total, suppliers(supplier_name)").order("created_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase.from("purchase_returns").select("id, return_number, return_date, grand_total, suppliers(supplier_name), purchase_return_details(qty, unit_name, buy_price, products(product_name))").order("created_at", { ascending: false }).limit(50);
       if (error) throw error;
       return data as unknown as ReturnHeader[];
+    },
+  });
+
+  const { data: salesReturns = [] } = useQuery({
+    queryKey: ["sales-returns"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, transaction_date:created_at, grand_total, customers(customer_name), sales_details(qty, unit_name, selling_price, products(product_name))").eq("transaction_status", "VOID").is("deleted_at", null).order("created_at", { ascending: false }).limit(50);
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -84,6 +96,9 @@ function ReturnsPage() {
 
   return (
     <div className="space-y-4">
+      <Tabs defaultValue="pembelian">
+        <TabsList><TabsTrigger value="pembelian">Retur Pembelian</TabsTrigger><TabsTrigger value="penjualan">Retur Penjualan</TabsTrigger></TabsList>
+        <TabsContent value="pembelian">
       <div className="flex justify-end">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Buat Retur</Button></DialogTrigger>
@@ -139,20 +154,52 @@ function ReturnsPage() {
       </div>
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
           <TableBody>
-            {returns.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Belum ada retur.</TableCell></TableRow>}
+            {returns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur pembelian.</TableCell></TableRow>}
             {returns.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-mono text-xs">{r.return_number}</TableCell>
                 <TableCell className="text-xs">{new Date(r.return_date).toLocaleDateString("id-ID")}</TableCell>
                 <TableCell>{r.suppliers?.supplier_name ?? "-"}</TableCell>
+                <TableCell className="text-xs max-w-[220px]">
+                  {(r.purchase_return_details ?? []).slice(0, 3).map((d, i) => (
+                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
+                  ))}
+                  {(r.purchase_return_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.purchase_return_details ?? []).length - 3} lainnya</div>}
+                </TableCell>
                 <TableCell className="text-right font-medium text-red-500">{formatRp(r.grand_total)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </CardContent></Card>
+        </TabsContent>
+        <TabsContent value="penjualan">
+          <Card><CardContent className="p-0">
+            <Table>
+              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Tanggal</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {salesReturns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur penjualan.</TableCell></TableRow>}
+                {(salesReturns as any[]).map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-mono text-xs">{r.sales_number}</TableCell>
+                    <TableCell className="text-xs">{new Date(r.transaction_date).toLocaleDateString("id-ID")}</TableCell>
+                    <TableCell>{r.customers?.customer_name ?? <span className="text-muted-foreground text-xs">Umum</span>}</TableCell>
+                    <TableCell className="text-xs max-w-[220px]">
+                      {(r.sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name}</span></div>
+                      ))}
+                      {(r.sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.sales_details ?? []).length - 3} lainnya</div>}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-red-500">{formatRp(r.grand_total)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent></Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
