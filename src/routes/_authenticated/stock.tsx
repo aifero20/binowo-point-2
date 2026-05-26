@@ -28,7 +28,25 @@ function StockPage() {
     },
   });
 
-  const typeColor: Record<string, "default" | "secondary" | "destructive"> = { purchase: "default", sale: "destructive", adjustment: "secondary" };
+  const typeLabel: Record<string, string> = {
+    purchase: "purchase",
+    sale: "sale",
+    adjustment: "adjustment",
+    transfer_in: "transfer_in",
+    transfer_out: "transfer_out",
+    sales_return: "sales_return",
+    return_out: "purchase_return",
+  };
+
+  const typeClass: Record<string, string> = {
+    purchase: "bg-blue-100 text-blue-700 border border-blue-200",
+    sale: "bg-red-100 text-red-700 border border-red-200",
+    adjustment: "bg-gray-100 text-gray-600 border border-gray-200",
+    transfer_in: "bg-green-100 text-green-700 border border-green-200",
+    transfer_out: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+    sales_return: "bg-red-50 text-red-400 border border-red-200",
+    return_out: "bg-blue-50 text-blue-400 border border-blue-200",
+  };
 
   return (
     <div className="space-y-4">
@@ -45,7 +63,7 @@ function StockPage() {
             {data.map((m) => (
               <TableRow key={m.id}>
                 <TableCell className="text-xs">{new Date(m.movement_date).toLocaleDateString("id-ID")}</TableCell>
-                <TableCell><Badge variant={typeColor[m.transaction_type] ?? "secondary"}>{m.transaction_type}</Badge></TableCell>
+                <TableCell><span className={["text-xs px-2 py-1 rounded-full font-medium", typeClass[m.transaction_type] ?? "bg-gray-100 text-gray-600"].join(" ")}>{typeLabel[m.transaction_type] ?? m.transaction_type}</span></TableCell>
                 <TableCell className="font-mono text-xs">{m.reference_number}</TableCell>
                 <TableCell className="text-sm">{m.products?.product_name ?? "-"}<span className="text-muted-foreground text-xs ml-1">({m.products?.product_code})</span></TableCell>
                 <TableCell className="text-xs">{m.warehouses?.warehouse_name ?? "-"}</TableCell>
