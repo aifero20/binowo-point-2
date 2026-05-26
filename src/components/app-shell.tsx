@@ -43,13 +43,20 @@ export function AppShell() {
     queryKey: ["role_permissions", roleCode],
     enabled: !!roleCode,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: rps, error } = await supabase
         .from("role_permissions")
-        .select("permissions(menu_code)")
+        .select("permission_id")
         .eq("role_code", roleCode)
         .eq("is_active", true);
       if (error) throw error;
-      return (data ?? []).map((r: any) => r.permissions?.menu_code).filter(Boolean) as string[];
+      const ids = (rps ?? []).map((r: any) => r.permission_id);
+      if (ids.length === 0) return [];
+      const { data: perms, error: e2 } = await supabase
+        .from("permissions")
+        .select("menu_code")
+        .in("id", ids);
+      if (e2) throw e2;
+      return (perms ?? []).map((p: any) => p.menu_code) as string[];
     },
   });
 
