@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, PowerOff, Power } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/users")({ component: UsersPage });
@@ -21,6 +21,8 @@ function UsersPage() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
+  const [confirmUser, setConfirmUser] = useState<User | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
   const [createEmail, setCreateEmail] = useState("");
   const [createPassword, setCreatePassword] = useState("");
   const [form, setForm] = useState<Partial<User>>({ user_code: "", full_name: "", role_code: "KASIR", is_admin: false, is_active: true });
@@ -71,16 +73,30 @@ function UsersPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("users").update({ deleted_at: new Date().toISOString(), is_active: false } as never).eq("id", id);
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase.from("users").update({ is_active } as never).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("User dihapus"); qc.invalidateQueries({ queryKey: ["users"] }); },
+    onSuccess: (_, { is_active }) => {
+      toast.success(is_active ? "User diaktifkan" : "User dinonaktifkan");
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   function resetForm() { setForm({ user_code: "", full_name: "", role_code: "KASIR", is_admin: false, is_active: true }); setEditing(null); setCreateEmail(""); setCreatePassword(""); }
+
+  function handleConfirmDeactivate() {
+    if (!confirmUser) return;
+    if (confirmEmail !== confirmUser.email) {
+      toast.error("Email tidak cocok");
+      return;
+    }
+    toggleActive.mutate({ id: confirmUser.id, is_active: false });
+    setConfirmUser(null);
+    setConfirmEmail("");
+  }
 
   return (
     <div className="space-y-4">
@@ -112,6 +128,30 @@ function UsersPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Dialog konfirmasi nonaktifkan */}
+      <Dialog open={!!confirmUser} onOpenChange={(o) => { if (!o) { setConfirmUser(null); setConfirmEmail(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Nonaktifkan User</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>User <span className="font-semibold">{confirmUser?.full_name}</span> akan dinonaktifkan dan tidak bisa login.</p>
+            <p className="text-muted-foreground">Ketik email user untuk konfirmasi:</p>
+            <p className="font-mono text-xs bg-muted px-2 py-1 rounded">{confirmUser?.email}</p>
+            <Input
+              placeholder="Ketik email di atas"
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setConfirmUser(null); setConfirmEmail(""); }}>Batal</Button>
+            <Button variant="destructive" onClick={handleConfirmDeactivate} disabled={confirmEmail !== confirmUser?.email}>
+              Nonaktifkan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card><CardContent className="p-0">
         <Table>
           <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
@@ -127,7 +167,10 @@ function UsersPage() {
                 <TableCell>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => { setEditing(u); setForm(u); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => { if (confirm("Hapus user?")) del.mutate(u.id); }}><Trash2 className="h-4 w-4" /></Button>
+                    {u.is_active
+                      ? <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => { setConfirmUser(u); setConfirmEmail(""); }}><PowerOff className="h-4 w-4" /></Button>
+                      : <Button size="icon" variant="ghost" className="text-green-600 hover:text-green-600" onClick={() => toggleActive.mutate({ id: u.id, is_active: true })}><Power className="h-4 w-4" /></Button>
+                    }
                   </div>
                 </TableCell>
               </TableRow>
