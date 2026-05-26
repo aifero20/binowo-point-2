@@ -212,8 +212,8 @@ function MasterInventoryPage() {
       <Tabs defaultValue="barang">
         <TabsList className="flex-wrap">
           <TabsTrigger value="barang">Master Barang</TabsTrigger>
-          <TabsTrigger value="movement">Movement Stok</TabsTrigger>
           <TabsTrigger value="harga">Riwayat Harga</TabsTrigger>
+          <TabsTrigger value="movement">Movement Stok</TabsTrigger>
           <TabsTrigger value="adjustment">Adjustment Stok</TabsTrigger>
           <TabsTrigger value="transfer">Transfer Stok</TabsTrigger>
         </TabsList>
