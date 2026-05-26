@@ -36,15 +36,35 @@ function UsersPage() {
 
   const save = useMutation({
     mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       if (editing) {
-        const { error } = await supabase.from("users").update({ ...form, email: createEmail || editing.email } as never).eq("id", editing.id);
-        if (error) throw error;
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({
+            action: "update",
+            userId: editing.id,
+            email: createEmail || undefined,
+            userData: { user_code: form.user_code, full_name: form.full_name, role_code: form.role_code, is_admin: form.role_code === "OWNER" || form.role_code === "ADMIN", is_active: form.is_active },
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Gagal update user");
       } else {
         if (!createEmail || !createPassword) throw new Error("Email dan password wajib diisi");
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({ email: createEmail, password: createPassword, email_confirm: true });
-        if (authError) throw authError;
-        const { error } = await supabase.from("users").insert({ ...form, email: createEmail, id: authData.user.id } as never);
-        if (error) throw error;
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({
+            action: "create",
+            email: createEmail,
+            password: createPassword,
+            userData: { user_code: form.user_code, full_name: form.full_name, role_code: form.role_code, is_admin: form.role_code === "OWNER" || form.role_code === "ADMIN", is_active: true },
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Gagal tambah user");
       }
     },
     onSuccess: () => { toast.success("User disimpan"); qc.invalidateQueries({ queryKey: ["users"] }); setOpen(false); resetForm(); },
