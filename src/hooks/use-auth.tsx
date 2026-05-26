@@ -56,10 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchRoles(userId: string) {
     const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    setRoles((data ?? []).map((r) => r.role as AppRole));
+      .from("users")
+      .select("role_code, is_active")
+      .eq("id", userId)
+      .single();
+
+    if (!data || data.is_active === false) {
+      await supabase.auth.signOut();
+      return;
+    }
+
+    const role = data.role_code?.toLowerCase() as AppRole;
+    setRoles(role ? [role] : []);
   }
 
   const value: AuthState = {
