@@ -26,6 +26,7 @@ import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPriceHistoryRouteImport } from './routes/_authenticated/price-history'
 import { Route as AuthenticatedPermissionsRouteImport } from './routes/_authenticated/permissions'
+import { Route as AuthenticatedMasterInventoryRouteImport } from './routes/_authenticated/master-inventory'
 import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/debts'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
@@ -118,6 +119,12 @@ const AuthenticatedPermissionsRoute =
     path: '/permissions',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedMasterInventoryRoute =
+  AuthenticatedMasterInventoryRouteImport.update({
+    id: '/master-inventory',
+    path: '/master-inventory',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDebtsRoute = AuthenticatedDebtsRouteImport.update({
   id: '/debts',
   path: '/debts',
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/master-inventory': typeof AuthenticatedMasterInventoryRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/price-history': typeof AuthenticatedPriceHistoryRoute
   '/products': typeof AuthenticatedProductsRoute
@@ -178,6 +186,7 @@ export interface FileRoutesByTo {
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/master-inventory': typeof AuthenticatedMasterInventoryRoute
   '/permissions': typeof AuthenticatedPermissionsRoute
   '/price-history': typeof AuthenticatedPriceHistoryRoute
   '/products': typeof AuthenticatedProductsRoute
@@ -203,6 +212,7 @@ export interface FileRoutesById {
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/debts': typeof AuthenticatedDebtsRoute
+  '/_authenticated/master-inventory': typeof AuthenticatedMasterInventoryRoute
   '/_authenticated/permissions': typeof AuthenticatedPermissionsRoute
   '/_authenticated/price-history': typeof AuthenticatedPriceHistoryRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/debts'
+    | '/master-inventory'
     | '/permissions'
     | '/price-history'
     | '/products'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/debts'
+    | '/master-inventory'
     | '/permissions'
     | '/price-history'
     | '/products'
@@ -275,6 +287,7 @@ export interface FileRouteTypes {
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/debts'
+    | '/_authenticated/master-inventory'
     | '/_authenticated/permissions'
     | '/_authenticated/price-history'
     | '/_authenticated/products'
@@ -418,6 +431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPermissionsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/master-inventory': {
+      id: '/_authenticated/master-inventory'
+      path: '/master-inventory'
+      fullPath: '/master-inventory'
+      preLoaderRoute: typeof AuthenticatedMasterInventoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/debts': {
       id: '/_authenticated/debts'
       path: '/debts'
@@ -462,6 +482,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDebtsRoute: typeof AuthenticatedDebtsRoute
+  AuthenticatedMasterInventoryRoute: typeof AuthenticatedMasterInventoryRoute
   AuthenticatedPermissionsRoute: typeof AuthenticatedPermissionsRoute
   AuthenticatedPriceHistoryRoute: typeof AuthenticatedPriceHistoryRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
@@ -483,6 +504,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDebtsRoute: AuthenticatedDebtsRoute,
+  AuthenticatedMasterInventoryRoute: AuthenticatedMasterInventoryRoute,
   AuthenticatedPermissionsRoute: AuthenticatedPermissionsRoute,
   AuthenticatedPriceHistoryRoute: AuthenticatedPriceHistoryRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
