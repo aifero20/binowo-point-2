@@ -58,7 +58,7 @@ function SalesPOS() {
     syncPendingSales();
     return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
   }, []);
-  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number } | null>(null);
+  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string } | null>(null);
 
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
@@ -169,7 +169,8 @@ function SalesPOS() {
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
       await supabase.from("stock_movements").insert(cart.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "sale", reference_number: sales_number, qty_out: l.qty, created_by: user!.id })) as never);
-      return { no: sales_number, items: [...cart], total: subtotal, bayar: paymentAmount, kembali: change };
+      const custName = customers.find((c) => c.id === customerId)?.customer_name ?? "Umum / Walk-in";
+      return { no: sales_number, items: [...cart], total: subtotal, bayar: paymentAmount, kembali: change, customerName: custName };
     },
     onSuccess: (data) => {
       toast.success(`Transaksi ${data.no} berhasil`);
@@ -453,9 +454,13 @@ function SalesPOS() {
           <DialogContent className="max-w-xs">
             <DialogHeader><DialogTitle className="text-center">Struk Pembayaran</DialogTitle></DialogHeader>
             <div className="font-mono text-xs space-y-1 border rounded p-3">
-              <p className="text-center font-bold text-sm">BINOWO KASIR</p>
+              <p className="text-center font-bold text-sm">GROSIR ROKOK BINOWO</p>
+              <p className="text-center">Binowo, Balarejo, Kebonsari</p>
+              <p className="text-center">Telp / WA : 0813 3113 1048</p>
+              <div className="border-t border-dashed my-2" />
               <p className="text-center text-muted-foreground">{new Date().toLocaleString("id-ID")}</p>
               <p className="text-center">{printData.no}</p>
+              <div className="flex justify-between"><span>Customer</span><span>{printData.customerName}</span></div>
               <div className="border-t border-dashed my-2" />
               {printData.items.map((item, i) => (
                 <div key={i}>
@@ -472,6 +477,10 @@ function SalesPOS() {
               <div className="flex justify-between"><span>Kembali</span><span>{formatRp(printData.kembali)}</span></div>
               <div className="border-t border-dashed my-2" />
               <p className="text-center">Terima kasih!</p>
+              <div className="border-t border-dashed my-2" />
+              <p className="text-center">Harga Sudah Termasuk PPN</p>
+              <p className="text-center">Barang yang sudah dibeli tdk</p>
+              <p className="text-center">dapat dikembalikan</p>
             </div>
             <DialogFooter>
               <Button className="w-full gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
