@@ -475,9 +475,9 @@ function SalesPOS() {
               <div className="flex justify-between"><span>Bayar</span><span>{formatRp(printData.bayar)}</span></div>
               <div className="flex justify-between"><span>Kembali</span><span>{formatRp(printData.kembali)}</span></div>
               <div className="border-t border-dashed my-2" />
-              <p className="text-center">Terima kasih!</p>
               <p className="text-center">Harga Sudah Termasuk PPN</p>
               <p className="text-center">Barang yg dibeli tdk dpt dikembalikan</p>
+              <p className="text-center">Terima kasih!</p>
             </div>
             <DialogFooter>
               <Button className="w-full gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
