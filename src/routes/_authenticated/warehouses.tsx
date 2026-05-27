@@ -36,7 +36,7 @@ function WarehousesPage() {
       const { error } = await op;
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Gudang disimpan"); qc.invalidateQueries({ queryKey: ["warehouses"] }); setOpen(false); setEditing(null); },
+    onSuccess: () => { toast.success("Gudang disimpan"); qc.invalidateQueries({ queryKey: ["warehouses"] }); qc.invalidateQueries({ queryKey: ["warehouses-active"] }); setOpen(false); setEditing(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -70,13 +70,22 @@ function WarehousesPage() {
 
 function WarehouseForm({ editing, onSubmit, loading }: { editing: Warehouse | null; onSubmit: (f: Partial<Warehouse>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Warehouse>>(editing ?? { warehouse_code: "", warehouse_name: "", is_active: true });
-  useEffect(() => { setForm(editing ?? {}); }, [editing]);
+  useEffect(() => { setForm(editing ?? { warehouse_code: "", warehouse_name: "", is_active: true }); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Gudang" : "Tambah Gudang"}</DialogTitle></DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
         <div className="space-y-1.5"><Label>Kode *</Label><Input required value={form.warehouse_code ?? ""} onChange={(e) => setForm({ ...form, warehouse_code: e.target.value })} /></div>
         <div className="space-y-1.5"><Label>Nama *</Label><Input required value={form.warehouse_name ?? ""} onChange={(e) => setForm({ ...form, warehouse_name: e.target.value })} /></div>
+        {form.warehouse_code !== undefined && (
+          <div className="flex items-center justify-between border rounded-lg px-3 py-2">
+            <Label className="cursor-pointer">Status Gudang</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={form.is_active ? "default" : "outline"} onClick={() => setForm({ ...form, is_active: true })}>Aktif</Button>
+              <Button type="button" size="sm" variant={!form.is_active ? "destructive" : "outline"} onClick={() => setForm({ ...form, is_active: false })}>Nonaktif</Button>
+            </div>
+          </div>
+        )}
         <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan"}</Button></DialogFooter>
       </form>
     </DialogContent>
