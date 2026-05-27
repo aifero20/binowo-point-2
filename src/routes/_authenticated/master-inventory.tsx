@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Package2, Tag, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Package2, Tag, AlertTriangle, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
@@ -29,9 +29,13 @@ function MasterInventoryPage() {
   const qc = useQueryClient();
 
   // Products state
-  const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [openProduct, setOpenProduct] = useState(false);
+  const [showFilterBarang, setShowFilterBarang] = useState(false);
+  const [filterBarangKode, setFilterBarangKode] = useState("");
+  const [filterBarangNama, setFilterBarangNama] = useState("");
+  const [pageBarang, setPageBarang] = useState(1);
+  const BARANG_PAGE_SIZE = 10;
 
   // Adjustment state
   const [openAdj, setOpenAdj] = useState(false);
@@ -53,15 +57,22 @@ function MasterInventoryPage() {
   const [priceSearch, setPriceSearch] = useState("");
 
   const { data: products = [], refetch: refetchProducts } = useQuery({
-    queryKey: ["inventory-products", search],
+    queryKey: ["inventory-products"],
     queryFn: async () => {
-      let q = supabase.from("product_stock_summary").select("*").is("deleted_at", null).eq("is_active", true).order("product_name").limit(200);
-      if (search) q = q.or(`product_name.ilike.%${search}%,product_code.ilike.%${search}%,barcode.ilike.%${search}%`);
-      const { data, error } = await q;
+      const { data, error } = await supabase.from("product_stock_summary").select("*").is("deleted_at", null).eq("is_active", true).order("product_name").limit(500);
       if (error) throw error;
       return (data ?? []) as Product[];
     },
   });
+
+  const filteredBarang = products.filter((p) => {
+    if (filterBarangKode && !p.product_code.toLowerCase().includes(filterBarangKode.toLowerCase())) return false;
+    if (filterBarangNama && !p.product_name.toLowerCase().includes(filterBarangNama.toLowerCase())) return false;
+    return true;
+  });
+  const totalPagesBarang = Math.max(1, Math.ceil(filteredBarang.length / BARANG_PAGE_SIZE));
+  const pagedBarang = filteredBarang.slice((pageBarang - 1) * BARANG_PAGE_SIZE, pageBarang * BARANG_PAGE_SIZE);
+  const isFilteredBarang = filterBarangKode || filterBarangNama;
 
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
@@ -221,18 +232,34 @@ function MasterInventoryPage() {
         {/* TAB MASTER BARANG */}
         <TabsContent value="barang" className="space-y-3">
           <div className="flex flex-wrap gap-2 items-center justify-between">
-            <Input placeholder="Cari barang / barcode..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-            <Dialog open={openProduct} onOpenChange={(o) => { setOpenProduct(o); if (!o) setEditing(null); }}>
-              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Tambah Barang</Button></DialogTrigger>
-              <ProductForm editing={editing} suppliers={suppliers} onSubmit={(f) => saveProduct.mutate(f as any)} loading={saveProduct.isPending} />
-            </Dialog>
+            <p className="text-sm text-muted-foreground">{filteredBarang.length} barang{isFilteredBarang ? " (difilter)" : ""}</p>
+            <div className="flex gap-2">
+              <Button variant={isFilteredBarang ? "default" : "outline"} className="gap-2" onClick={() => setShowFilterBarang((v) => !v)}>
+                <SlidersHorizontal className="h-4 w-4" />Filter{isFilteredBarang ? " (aktif)" : ""}
+              </Button>
+              <Dialog open={openProduct} onOpenChange={(o) => { setOpenProduct(o); if (!o) setEditing(null); }}>
+                <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Tambah Barang</Button></DialogTrigger>
+                <ProductForm editing={editing} suppliers={suppliers} onSubmit={(f) => saveProduct.mutate(f as any)} loading={saveProduct.isPending} />
+              </Dialog>
+            </div>
           </div>
+          {showFilterBarang && (
+            <Card className="border-dashed">
+              <CardContent className="pt-4 pb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>Kode Barang</Label><Input placeholder="Cari kode..." value={filterBarangKode} onChange={(e) => { setFilterBarangKode(e.target.value); setPageBarang(1); }} /></div>
+                  <div className="space-y-1.5"><Label>Nama Barang</Label><Input placeholder="Cari nama..." value={filterBarangNama} onChange={(e) => { setFilterBarangNama(e.target.value); setPageBarang(1); }} /></div>
+                </div>
+                {isFilteredBarang && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setFilterBarangKode(""); setFilterBarangNama(""); setPageBarang(1); }}>Reset Filter</Button>}
+              </CardContent>
+            </Card>
+          )}
           <Card><CardContent className="p-0">
             <Table>
               <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead>Satuan</TableHead><TableHead className="text-right">Stok</TableHead><TableHead className="text-right">Harga Beli</TableHead><TableHead className="text-right">Retail</TableHead><TableHead className="text-right">Grosir</TableHead><TableHead className="w-32" /></TableRow></TableHeader>
               <TableBody>
-                {products.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada barang.</TableCell></TableRow>}
-                {products.map((p) => (
+                {pagedBarang.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada barang.</TableCell></TableRow>}
+                {pagedBarang.map((p) => (
                   <TableRow key={p.product_id}>
                     <TableCell className="font-mono text-xs">{p.product_code}</TableCell>
                     <TableCell className="font-medium">{p.product_name}</TableCell>
@@ -256,6 +283,15 @@ function MasterInventoryPage() {
                 ))}
               </TableBody>
             </Table>
+            {totalPagesBarang > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                <span>Halaman {pageBarang} dari {totalPagesBarang} ({filteredBarang.length} data)</span>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" disabled={pageBarang === 1} onClick={() => setPageBarang((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" disabled={pageBarang === totalPagesBarang} onClick={() => setPageBarang((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            )}
           </CardContent></Card>
         </TabsContent>
 

@@ -8,29 +8,49 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Pencil, Trash2, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/suppliers")({ component: SuppliersPage });
 
 type Supplier = { id: string; supplier_code: string; supplier_name: string; phone: string | null; city: string | null; supplier_type: string | null };
 
+const PAGE_SIZE = 10;
+
 function SuppliersPage() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [open, setOpen] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterCode, setFilterCode] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterCity, setFilterCity] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { data = [] } = useQuery({
-    queryKey: ["suppliers", search],
+  const { data: allData = [] } = useQuery({
+    queryKey: ["suppliers"],
     queryFn: async () => {
-      let q = supabase.from("suppliers").select("*").is("deleted_at", null).order("supplier_name");
-      if (search) q = q.or(`supplier_name.ilike.%${search}%,supplier_code.ilike.%${search}%`);
-      const { data, error } = await q;
+      const { data, error } = await supabase.from("suppliers").select("*").is("deleted_at", null).order("supplier_name");
       if (error) throw error;
       return data as Supplier[];
     },
   });
+
+  const filtered = allData.filter((s) => {
+    if (filterCode && !s.supplier_code.toLowerCase().includes(filterCode.toLowerCase())) return false;
+    if (filterName && !s.supplier_name.toLowerCase().includes(filterName.toLowerCase())) return false;
+    if (filterType && !(s.supplier_type ?? "").toLowerCase().includes(filterType.toLowerCase())) return false;
+    if (filterCity && !(s.city ?? "").toLowerCase().includes(filterCity.toLowerCase())) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const data = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const isFiltered = filterCode || filterName || filterType || filterCity;
+
+  function resetFilter() { setFilterCode(""); setFilterName(""); setFilterType(""); setFilterCity(""); setPage(1); }
 
   const save = useMutation({
     mutationFn: async (form: Partial<Supplier>) => {
@@ -53,15 +73,35 @@ function SuppliersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center justify-between">
-        <Input placeholder="Cari supplier..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
-          <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" /> Tambah Supplier</Button></DialogTrigger>
-          <SupplierForm editing={editing} onSubmit={(f) => save.mutate(f)} loading={save.isPending} />
-        </Dialog>
+        <p className="text-sm text-muted-foreground">{filtered.length} supplier{isFiltered ? " (difilter)" : ""}</p>
+        <div className="flex gap-2">
+          <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter((v) => !v)}>
+            <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
+          </Button>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+            <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Tambah Supplier</Button></DialogTrigger>
+            <SupplierForm editing={editing} onSubmit={(f) => save.mutate(f)} loading={save.isPending} />
+          </Dialog>
+        </div>
       </div>
+
+      {showFilter && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 pb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Kode</Label><Input placeholder="Cari kode..." value={filterCode} onChange={(e) => { setFilterCode(e.target.value); setPage(1); }} /></div>
+              <div className="space-y-1.5"><Label>Nama</Label><Input placeholder="Cari nama..." value={filterName} onChange={(e) => { setFilterName(e.target.value); setPage(1); }} /></div>
+              <div className="space-y-1.5"><Label>Tipe</Label><Input placeholder="Cari tipe..." value={filterType} onChange={(e) => { setFilterType(e.target.value); setPage(1); }} /></div>
+              <div className="space-y-1.5"><Label>Kota</Label><Input placeholder="Cari kota..." value={filterCity} onChange={(e) => { setFilterCity(e.target.value); setPage(1); }} /></div>
+            </div>
+            {isFiltered && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={resetFilter}>Reset Filter</Button>}
+          </CardContent>
+        </Card>
+      )}
+
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead>Kota</TableHead><TableHead>Telepon</TableHead><TableHead>Tipe</TableHead><TableHead className="w-32" /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead>Kota</TableHead><TableHead>Telepon</TableHead><TableHead>Tipe</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
           <TableBody>
             {data.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada supplier.</TableCell></TableRow>}
             {data.map((s) => (
@@ -81,6 +121,15 @@ function SuppliersPage() {
             ))}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+            <span>Halaman {page} dari {totalPages} ({filtered.length} data)</span>
+            <div className="flex gap-1">
+              <Button size="icon" variant="ghost" disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+          </div>
+        )}
       </CardContent></Card>
     </div>
   );
@@ -88,7 +137,7 @@ function SuppliersPage() {
 
 function SupplierForm({ editing, onSubmit, loading }: { editing: Supplier | null; onSubmit: (f: Partial<Supplier>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Supplier>>(editing ?? { supplier_code: "", supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" });
-  useEffect(() => { setForm(editing ?? {}); }, [editing]);
+  useEffect(() => { setForm(editing ?? { supplier_code: "", supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" }); }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Supplier" : "Tambah Supplier"}</DialogTitle></DialogHeader>
