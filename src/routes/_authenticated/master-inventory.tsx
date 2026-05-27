@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/master-inventory")({ compo
 type Product = { product_id: string; product_code: string; product_name: string; barcode: string | null; default_unit: string; current_buy_price: number; current_retail_price: number; current_wholesale_price: number; minimum_stock: number; current_stock: number; supplier_id: string | null; is_active: boolean; deleted_at: string | null };
 type StockMovement = { id: string; movement_date: string; transaction_type: string; reference_number: string; qty_in: number; qty_out: number; balance_after: number | null; products: { product_name: string; product_code: string } | null; warehouses: { warehouse_name: string } | null };
 type PriceHistory = { id: string; change_date: string; old_buy_price: number; new_buy_price: number; old_retail_price: number; new_retail_price: number; old_wholesale_price: number; new_wholesale_price: number; products: { product_name: string; product_code: string } | null };
-type AdjLine = { product_id: string; product_name: string; unit_name: string; qty_system: number; qty_actual: number };
+type AdjLine = { product_id: string; product_name: string; unit_name: string; qty_system_before: number; qty_system: number; qty_actual: number };
 type TransferLine = { product_id: string; product_name: string; unit_name: string; qty: number };
 
 function MasterInventoryPage() {
@@ -147,7 +147,7 @@ function MasterInventoryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stock_adjustments")
-        .select("id, adjustment_number, adjustment_date, warehouses(warehouse_name), stock_adjustment_details(product_id, qty_system, qty_actual, qty_difference, products(product_name, product_code))")
+        .select("id, adjustment_number, adjustment_date, warehouses(warehouse_name), stock_adjustment_details(product_id, qty_system_before, qty_system, qty_actual, qty_difference, products(product_name, product_code))")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -459,7 +459,7 @@ function MasterInventoryPage() {
                     <Input autoFocus placeholder="Cari nama barang..." value={adjSearch} onChange={(e) => setAdjSearch(e.target.value)} />
                     <div className="border rounded max-h-48 overflow-y-auto divide-y">
                       {products.filter((p) => !adjSearch || p.product_name.toLowerCase().includes(adjSearch.toLowerCase())).slice(0, 10).map((p) => (
-                        <div key={p.product_id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setAdjLines((prev) => prev.find((l) => l.product_id === p.product_id) ? prev : [...prev, { product_id: p.product_id, product_name: p.product_name, unit_name: p.default_unit, qty_system: p.current_stock, qty_actual: p.current_stock }])}>
+                        <div key={p.product_id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setAdjLines((prev) => prev.find((l) => l.product_id === p.product_id) ? prev : [...prev, { product_id: p.product_id, product_name: p.product_name, unit_name: p.default_unit, qty_system_before: p.current_stock, qty_system: p.current_stock, qty_actual: p.current_stock }])}>
                           <span>{p.product_name}</span>
                           <span className="text-muted-foreground text-xs">Stok: {p.current_stock} {p.default_unit}</span>
                         </div>
@@ -526,11 +526,11 @@ function MasterInventoryPage() {
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
                       {(() => {
-                        const sistemSebelum = d.qty_system;
+                        const sistemSebelum = d.qty_system_before ?? d.qty_system;
                         const sistemSesudah = d.qty_system;
-                        const fisikSebelum = d.qty_system;
+                        const fisikSebelum = d.qty_system_before ?? d.qty_system;
                         const fisikSesudah = d.qty_actual;
-                        const selisih = d.qty_difference;
+                        const selisih = d.qty_actual - d.qty_system;
                         return (
                           <>
                             <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum}</TableCell>
