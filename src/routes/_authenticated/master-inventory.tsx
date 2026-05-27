@@ -145,7 +145,11 @@ function MasterInventoryPage() {
   const { data: adjustments = [] } = useQuery({
     queryKey: ["inventory-adjustments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("stock_adjustments").select("id, adjustment_number, adjustment_date, warehouses(warehouse_name)").order("created_at", { ascending: false }).limit(50);
+      const { data, error } = await supabase
+        .from("stock_adjustments")
+        .select("id, adjustment_number, adjustment_date, warehouses(warehouse_name), stock_adjustment_details(product_id, qty_system, qty_actual, qty_difference, products(product_name, product_code))")
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data ?? [];
     },
@@ -435,7 +439,7 @@ function MasterInventoryPage() {
         {/* TAB ADJUSTMENT STOK */}
         <TabsContent value="adjustment" className="space-y-3">
           <div className="flex items-center justify-between">
-            <div />
+            <p className="text-sm text-muted-foreground">{adjustments.length} adjustment</p>
             <Dialog open={openAdj} onOpenChange={setOpenAdj}>
               <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Adjustment Stok</Button></DialogTrigger>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -487,16 +491,50 @@ function MasterInventoryPage() {
           </div>
           <Card><CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>No. Adjustment</TableHead><TableHead>Tanggal</TableHead><TableHead>Gudang</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>No. Adjustment</TableHead>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>Gudang</TableHead>
+                  <TableHead>Barang</TableHead>
+                  <TableHead className="text-right">Stok Sistem</TableHead>
+                  <TableHead className="text-right">Stok Aktual</TableHead>
+                  <TableHead className="text-right">Selisih</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
-                {adjustments.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">Belum ada adjustment.</TableCell></TableRow>}
-                {(adjustments as any[]).map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-mono text-xs">{a.adjustment_number}</TableCell>
-                    <TableCell className="text-xs">{new Date(a.adjustment_date).toLocaleDateString("id-ID")}</TableCell>
-                    <TableCell>{a.warehouses?.warehouse_name ?? "-"}</TableCell>
-                  </TableRow>
-                ))}
+                {adjustments.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada adjustment.</TableCell></TableRow>}
+                {(adjustments as any[]).map((a) => {
+                  const details = a.stock_adjustment_details ?? [];
+                  if (details.length === 0) {
+                    return (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-mono text-xs">{a.adjustment_number}</TableCell>
+                        <TableCell className="text-xs">{new Date(a.adjustment_date).toLocaleDateString("id-ID")}</TableCell>
+                        <TableCell>{a.warehouses?.warehouse_name ?? "-"}</TableCell>
+                        <TableCell colSpan={4} className="text-muted-foreground text-xs">-</TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return details.map((d: any, i: number) => (
+                    <TableRow key={`${a.id}-${i}`} className={i > 0 ? "border-t-0" : ""}>
+                      <TableCell className="font-mono text-xs">{i === 0 ? a.adjustment_number : ""}</TableCell>
+                      <TableCell className="text-xs">{i === 0 ? new Date(a.adjustment_date).toLocaleDateString("id-ID") : ""}</TableCell>
+                      <TableCell className="text-xs">{i === 0 ? (a.warehouses?.warehouse_name ?? "-") : ""}</TableCell>
+                      <TableCell>
+                        <p className="font-medium text-sm">{d.products?.product_name ?? "-"}</p>
+                        <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">{d.qty_system}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{d.qty_actual}</TableCell>
+                      <TableCell className="text-right text-sm font-bold">
+                        <span className={d.qty_difference > 0 ? "text-green-600" : d.qty_difference < 0 ? "text-red-500" : "text-muted-foreground"}>
+                          {d.qty_difference > 0 ? `+${d.qty_difference}` : d.qty_difference}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })}
               </TableBody>
             </Table>
           </CardContent></Card>
@@ -507,7 +545,8 @@ function MasterInventoryPage() {
           <div className="flex items-center justify-between">
             <div />
             <Dialog open={openTransfer} onOpenChange={setOpenTransfer}>
-              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Transfer Stok</Button></DialogTrigger>
+              <Button size="lg" onClick={() => toast.info("Layanan ini belum tersedia")} type="button"><Plus className="h-4 w-4 mr-1" />Transfer Stok</Button>
+              <span style={{display:"none"}}>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Transfer Stok Antar Gudang</DialogTitle></DialogHeader>
                 <div className="grid md:grid-cols-2 gap-4">
