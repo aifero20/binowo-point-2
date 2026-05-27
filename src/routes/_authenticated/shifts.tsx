@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: ShiftsPage });
 
-type Shift = { id: string; open_time: string; close_time: string | null; opening_cash: number; closing_cash: number; expected_cash: number; cash_difference: number; shift_status: string; cashier_id: string | null; total_tunai: number; total_qris: number; total_transfer: number; total_pembelian_tunai: number; users?: { full_name: string } | null };
+type Shift = { id: string; open_time: string; close_time: string | null; opening_cash: number; closing_cash: number; expected_cash: number; cash_difference: number; shift_status: string; cashier_id: string | null; total_tunai: number; total_qris: number; total_transfer: number; total_pembelian_tunai: number; kasir_name?: string };
 
 const PAGE_SIZE = 10;
 
@@ -37,12 +37,20 @@ function ShiftsPage() {
   const { data: allShifts = [] } = useQuery({
     queryKey: ["shifts", filterFrom, filterTo],
     queryFn: async () => {
-      let q = supabase.from("cashier_shifts").select("*, users(full_name)").order("open_time", { ascending: false });
+      let q = supabase.from("cashier_shifts").select("*").order("open_time", { ascending: false });
       if (filterFrom) q = q.gte("open_time", filterFrom + "T00:00:00");
       if (filterTo) q = q.lte("open_time", filterTo + "T23:59:59");
       const { data, error } = await q;
       if (error) throw error;
-      return data as Shift[];
+      const shifts = data as Shift[];
+      const cashierIds = [...new Set(shifts.map((s) => s.cashier_id).filter(Boolean))];
+      if (cashierIds.length > 0) {
+        const { data: users } = await supabase.from("users").select("id, full_name").in("id", cashierIds);
+        const userMap: Record<string, string> = {};
+        (users ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
+        return shifts.map((s) => ({ ...s, kasir_name: s.cashier_id ? (userMap[s.cashier_id] ?? "-") : "-" }));
+      }
+      return shifts.map((s) => ({ ...s, kasir_name: "-" }));
     },
   });
 
@@ -65,12 +73,8 @@ function ShiftsPage() {
       const tunai = (sales ?? []).filter((s: any) => s.payment_method === "TUNAI").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const qris = (sales ?? []).filter((s: any) => s.payment_method === "QRIS").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const transfer = (sales ?? []).filter((s: any) => s.payment_method === "TRANSFER").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
-      // Retur penjualan tunai (jika ada payment_method)
-      const { data: salesReturns } = await supabase.from("sales_returns")
-        .select("grand_total, payment_method")
-        .gte("return_date", from)
-        .is("deleted_at", null);
-      const returTunai = (salesReturns ?? []).filter((r: any) => r.payment_method === "TUNAI").reduce((a: number, r: any) => a + Number(r.grand_total), 0);
+      // Retur penjualan tunai — belum diimplementasi, default 0
+      const returTunai = 0;
       // Pembelian tunai (LUNAS)
       const { data: purchases } = await supabase.from("purchase_headers")
         .select("grand_total, payment_status")
@@ -174,7 +178,7 @@ function ShiftsPage() {
             {shifts.length === 0 && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">Belum ada shift.</TableCell></TableRow>}
             {shifts.map((s) => (
               <TableRow key={s.id}>
-                <TableCell className="font-medium text-sm">{(s.users as any)?.full_name ?? "-"}</TableCell>
+                <TableCell className="font-medium text-sm">{s.kasir_name ?? "-"}</TableCell>
                 <TableCell className="text-xs">{new Date(s.open_time).toLocaleString("id-ID")}</TableCell>
                 <TableCell className="text-xs">{s.close_time ? new Date(s.close_time).toLocaleString("id-ID") : "-"}</TableCell>
                 <TableCell className="text-right">{formatRp(s.opening_cash)}</TableCell>
