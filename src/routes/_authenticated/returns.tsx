@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { useRequireShift } from "@/hooks/use-require-shift";
 
 export const Route = createFileRoute("/_authenticated/returns")({ component: ReturnsPage });
 
@@ -25,7 +26,10 @@ const PAGE_SIZE = 10;
 
 function ReturnsPage() {
   const { user } = useAuth();
+  const { needsShift, isLoading: shiftLoading, hasOpenShift } = useRequireShift();
   const qc = useQueryClient();
+  if (needsShift && shiftLoading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Memeriksa shift...</p></div>;
+  if (needsShift && !hasOpenShift) return null;
 
   // Retur Pembelian form
   const [open, setOpen] = useState(false);

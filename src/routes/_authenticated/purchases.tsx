@@ -13,6 +13,7 @@ import { Plus, Trash2, ShoppingBag, SlidersHorizontal, ChevronLeft, ChevronRight
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { useRequireShift } from "@/hooks/use-require-shift";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: PurchasesPage });
 
@@ -73,7 +74,10 @@ function exportCSV(data: PurchaseHeader[], filterInfo: string, filterFrom: strin
 
 function PurchasesPage() {
   const { user } = useAuth();
+  const { needsShift, isLoading: shiftLoading, hasOpenShift } = useRequireShift();
   const qc = useQueryClient();
+  if (needsShift && shiftLoading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Memeriksa shift...</p></div>;
+  if (needsShift && !hasOpenShift) return null;
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [supplierId, setSupplierId] = useState("");
