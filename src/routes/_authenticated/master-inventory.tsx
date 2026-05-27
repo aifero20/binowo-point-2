@@ -52,9 +52,24 @@ function MasterInventoryPage() {
   const [transferLines, setTransferLines] = useState<TransferLine[]>([]);
   const [transferSearch, setTransferSearch] = useState("");
 
-  // Stock filter
-  const [stockSearch, setStockSearch] = useState("");
-  const [priceSearch, setPriceSearch] = useState("");
+  // Movement filter + pagination
+  const [showFilterMov, setShowFilterMov] = useState(false);
+  const [filterMovFrom, setFilterMovFrom] = useState("");
+  const [filterMovTo, setFilterMovTo] = useState("");
+  const [filterMovTipe, setFilterMovTipe] = useState("");
+  const [filterMovRef, setFilterMovRef] = useState("");
+  const [filterMovBarang, setFilterMovBarang] = useState("");
+  const [filterMovGudang, setFilterMovGudang] = useState("");
+  const [pageMov, setPageMov] = useState(1);
+  const MOV_PAGE_SIZE = 10;
+
+  // Riwayat harga filter + pagination
+  const [showFilterPrice, setShowFilterPrice] = useState(false);
+  const [filterPriceFrom, setFilterPriceFrom] = useState("");
+  const [filterPriceTo, setFilterPriceTo] = useState("");
+  const [filterPriceBarang, setFilterPriceBarang] = useState("");
+  const [pagePrice, setPagePrice] = useState(1);
+  const PRICE_PAGE_SIZE = 10;
 
   const { data: products = [], refetch: refetchProducts } = useQuery({
     queryKey: ["inventory-products"],
@@ -85,24 +100,47 @@ function MasterInventoryPage() {
   });
 
   const { data: movements = [] } = useQuery({
-    queryKey: ["inventory-movements", stockSearch],
+    queryKey: ["inventory-movements"],
     queryFn: async () => {
-      let q = supabase.from("stock_movements").select("id, movement_date, transaction_type, reference_number, qty_in, qty_out, balance_after, products(product_name, product_code), warehouses(warehouse_name)").order("movement_date", { ascending: false }).limit(200);
-      if (stockSearch) q = q.or(`reference_number.ilike.%${stockSearch}%`);
-      const { data, error } = await q;
+      const { data, error } = await supabase.from("stock_movements").select("id, movement_date, transaction_type, reference_number, qty_in, qty_out, balance_after, products(product_name, product_code), warehouses(warehouse_name)").order("movement_date", { ascending: false }).limit(1000);
       if (error) throw error;
       return (data ?? []) as StockMovement[];
     },
   });
 
+  const filteredMov = movements.filter((m) => {
+    const dateStr = m.movement_date.slice(0, 10);
+    if (filterMovFrom && dateStr < filterMovFrom) return false;
+    if (filterMovTo && dateStr > filterMovTo) return false;
+    if (filterMovTipe && !m.transaction_type.toLowerCase().includes(filterMovTipe.toLowerCase())) return false;
+    if (filterMovRef && !m.reference_number.toLowerCase().includes(filterMovRef.toLowerCase())) return false;
+    if (filterMovBarang && !(m.products?.product_name ?? "").toLowerCase().includes(filterMovBarang.toLowerCase())) return false;
+    if (filterMovGudang && !(m.warehouses?.warehouse_name ?? "").toLowerCase().includes(filterMovGudang.toLowerCase())) return false;
+    return true;
+  });
+  const totalPagesMov = Math.max(1, Math.ceil(filteredMov.length / MOV_PAGE_SIZE));
+  const pagedMov = filteredMov.slice((pageMov - 1) * MOV_PAGE_SIZE, pageMov * MOV_PAGE_SIZE);
+  const isFilteredMov = filterMovFrom || filterMovTo || filterMovTipe || filterMovRef || filterMovBarang || filterMovGudang;
+
   const { data: priceHistory = [] } = useQuery({
-    queryKey: ["inventory-price-history", priceSearch],
+    queryKey: ["inventory-price-history"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("price_history").select("id, change_date, old_buy_price, new_buy_price, old_retail_price, new_retail_price, old_wholesale_price, new_wholesale_price, products(product_name, product_code)").order("change_date", { ascending: false }).limit(100);
+      const { data, error } = await supabase.from("price_history").select("id, change_date, old_buy_price, new_buy_price, old_retail_price, new_retail_price, old_wholesale_price, new_wholesale_price, products(product_name, product_code)").order("change_date", { ascending: false }).limit(500);
       if (error) throw error;
       return (data ?? []) as PriceHistory[];
     },
   });
+
+  const filteredPrice = priceHistory.filter((h) => {
+    const dateStr = h.change_date.slice(0, 10);
+    if (filterPriceFrom && dateStr < filterPriceFrom) return false;
+    if (filterPriceTo && dateStr > filterPriceTo) return false;
+    if (filterPriceBarang && !(h.products?.product_name ?? "").toLowerCase().includes(filterPriceBarang.toLowerCase()) && !(h.products?.product_code ?? "").toLowerCase().includes(filterPriceBarang.toLowerCase())) return false;
+    return true;
+  });
+  const totalPagesPrice = Math.max(1, Math.ceil(filteredPrice.length / PRICE_PAGE_SIZE));
+  const pagedPrice = filteredPrice.slice((pagePrice - 1) * PRICE_PAGE_SIZE, pagePrice * PRICE_PAGE_SIZE);
+  const isFilteredPrice = filterPriceFrom || filterPriceTo || filterPriceBarang;
 
   const { data: adjustments = [] } = useQuery({
     queryKey: ["inventory-adjustments"],
@@ -210,7 +248,6 @@ function MasterInventoryPage() {
   const typeLabel: Record<string, string> = { purchase: "purchase", sale: "sale", adjustment: "adjustment", transfer_in: "transfer_in", transfer_out: "transfer_out", sales_return: "sales_return", return_out: "purchase_return" };
   const typeClass: Record<string, string> = { purchase: "bg-blue-100 text-blue-700 border border-blue-200", sale: "bg-red-100 text-red-700 border border-red-200", adjustment: "bg-gray-100 text-gray-600 border border-gray-200", transfer_in: "bg-green-100 text-green-700 border border-green-200", transfer_out: "bg-yellow-100 text-yellow-700 border border-yellow-200", sales_return: "bg-red-50 text-red-400 border border-red-200", return_out: "bg-blue-50 text-blue-400 border border-blue-200" };
 
-  const filteredPrice = priceSearch ? priceHistory.filter((h) => h.products?.product_name?.toLowerCase().includes(priceSearch.toLowerCase()) || h.products?.product_code?.toLowerCase().includes(priceSearch.toLowerCase())) : priceHistory;
 
   function priceDiff(o: number, n: number) {
     const d = n - o;
@@ -297,13 +334,31 @@ function MasterInventoryPage() {
 
         {/* TAB MOVEMENT STOK */}
         <TabsContent value="movement" className="space-y-3">
-          <Input placeholder="Cari no. referensi..." value={stockSearch} onChange={(e) => setStockSearch(e.target.value)} className="max-w-sm" />
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            <p className="text-sm text-muted-foreground">{filteredMov.length} data{isFilteredMov ? " (difilter)" : ""}</p>
+            <Button variant={isFilteredMov ? "default" : "outline"} className="gap-2" onClick={() => setShowFilterMov((v) => !v)}>
+              <SlidersHorizontal className="h-4 w-4" />Filter{isFilteredMov ? " (aktif)" : ""}
+            </Button>
+          </div>
+          {showFilterMov && (
+            <Card className="border-dashed"><CardContent className="pt-4 pb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={filterMovFrom} onChange={(e) => { setFilterMovFrom(e.target.value); setPageMov(1); }} /></div>
+                <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={filterMovTo} onChange={(e) => { setFilterMovTo(e.target.value); setPageMov(1); }} /></div>
+                <div className="space-y-1.5"><Label>Tipe</Label><Input placeholder="Cari tipe..." value={filterMovTipe} onChange={(e) => { setFilterMovTipe(e.target.value); setPageMov(1); }} /></div>
+                <div className="space-y-1.5"><Label>Referensi</Label><Input placeholder="Cari no. referensi..." value={filterMovRef} onChange={(e) => { setFilterMovRef(e.target.value); setPageMov(1); }} /></div>
+                <div className="space-y-1.5"><Label>Barang</Label><Input placeholder="Cari nama barang..." value={filterMovBarang} onChange={(e) => { setFilterMovBarang(e.target.value); setPageMov(1); }} /></div>
+                <div className="space-y-1.5"><Label>Gudang</Label><Input placeholder="Cari gudang..." value={filterMovGudang} onChange={(e) => { setFilterMovGudang(e.target.value); setPageMov(1); }} /></div>
+              </div>
+              {isFilteredMov && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setFilterMovFrom(""); setFilterMovTo(""); setFilterMovTipe(""); setFilterMovRef(""); setFilterMovBarang(""); setFilterMovGudang(""); setPageMov(1); }}>Reset Filter</Button>}
+            </CardContent></Card>
+          )}
           <Card><CardContent className="p-0">
             <Table>
               <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Tipe</TableHead><TableHead>Referensi</TableHead><TableHead>Barang</TableHead><TableHead>Gudang</TableHead><TableHead className="text-right">Masuk</TableHead><TableHead className="text-right">Keluar</TableHead></TableRow></TableHeader>
               <TableBody>
-                {movements.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada data.</TableCell></TableRow>}
-                {movements.map((m) => (
+                {pagedMov.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada data.</TableCell></TableRow>}
+                {pagedMov.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="text-xs">{new Date(m.movement_date).toLocaleDateString("id-ID")}</TableCell>
                     <TableCell><span className={["text-xs px-2 py-1 rounded-full font-medium", typeClass[m.transaction_type] ?? "bg-gray-100 text-gray-600"].join(" ")}>{typeLabel[m.transaction_type] ?? m.transaction_type}</span></TableCell>
@@ -316,18 +371,42 @@ function MasterInventoryPage() {
                 ))}
               </TableBody>
             </Table>
+            {totalPagesMov > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                <span>Halaman {pageMov} dari {totalPagesMov} ({filteredMov.length} data)</span>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" disabled={pageMov === 1} onClick={() => setPageMov((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" disabled={pageMov === totalPagesMov} onClick={() => setPageMov((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            )}
           </CardContent></Card>
         </TabsContent>
 
         {/* TAB RIWAYAT HARGA */}
         <TabsContent value="harga" className="space-y-3">
-          <Input placeholder="Cari nama / kode barang..." value={priceSearch} onChange={(e) => setPriceSearch(e.target.value)} className="max-w-sm" />
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            <p className="text-sm text-muted-foreground">{filteredPrice.length} data{isFilteredPrice ? " (difilter)" : ""}</p>
+            <Button variant={isFilteredPrice ? "default" : "outline"} className="gap-2" onClick={() => setShowFilterPrice((v) => !v)}>
+              <SlidersHorizontal className="h-4 w-4" />Filter{isFilteredPrice ? " (aktif)" : ""}
+            </Button>
+          </div>
+          {showFilterPrice && (
+            <Card className="border-dashed"><CardContent className="pt-4 pb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={filterPriceFrom} onChange={(e) => { setFilterPriceFrom(e.target.value); setPagePrice(1); }} /></div>
+                <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={filterPriceTo} onChange={(e) => { setFilterPriceTo(e.target.value); setPagePrice(1); }} /></div>
+                <div className="space-y-1.5 sm:col-span-2"><Label>Barang</Label><Input placeholder="Cari nama / kode barang..." value={filterPriceBarang} onChange={(e) => { setFilterPriceBarang(e.target.value); setPagePrice(1); }} /></div>
+              </div>
+              {isFilteredPrice && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setFilterPriceFrom(""); setFilterPriceTo(""); setFilterPriceBarang(""); setPagePrice(1); }}>Reset Filter</Button>}
+            </CardContent></Card>
+          )}
           <Card><CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Barang</TableHead><TableHead className="text-right">Harga Beli Lama</TableHead><TableHead className="text-right">Harga Beli Baru</TableHead><TableHead className="text-right">Retail Lama</TableHead><TableHead className="text-right">Retail Baru</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Barang</TableHead><TableHead className="text-right">Beli Lama</TableHead><TableHead className="text-right">Beli Baru</TableHead><TableHead className="text-right">Retail Lama</TableHead><TableHead className="text-right">Retail Baru</TableHead><TableHead className="text-right">Grosir Lama</TableHead><TableHead className="text-right">Grosir Baru</TableHead></TableRow></TableHeader>
               <TableBody>
-                {filteredPrice.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada riwayat harga.</TableCell></TableRow>}
-                {filteredPrice.map((h) => (
+                {pagedPrice.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada riwayat harga.</TableCell></TableRow>}
+                {pagedPrice.map((h) => (
                   <TableRow key={h.id}>
                     <TableCell className="text-xs">{new Date(h.change_date).toLocaleString("id-ID")}</TableCell>
                     <TableCell><p className="font-medium text-sm">{h.products?.product_name ?? "-"}</p><p className="text-xs text-muted-foreground">{h.products?.product_code}</p></TableCell>
@@ -335,10 +414,21 @@ function MasterInventoryPage() {
                     <TableCell className="text-right text-sm font-medium">{formatRp(h.new_buy_price)}{priceDiff(h.old_buy_price, h.new_buy_price)}</TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">{formatRp(h.old_retail_price)}</TableCell>
                     <TableCell className="text-right text-sm font-medium">{formatRp(h.new_retail_price)}{priceDiff(h.old_retail_price, h.new_retail_price)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">{formatRp(h.old_wholesale_price)}</TableCell>
+                    <TableCell className="text-right text-sm font-medium">{formatRp(h.new_wholesale_price)}{priceDiff(h.old_wholesale_price, h.new_wholesale_price)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            {totalPagesPrice > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                <span>Halaman {pagePrice} dari {totalPagesPrice} ({filteredPrice.length} data)</span>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" disabled={pagePrice === 1} onClick={() => setPagePrice((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" disabled={pagePrice === totalPagesPrice} onClick={() => setPagePrice((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            )}
           </CardContent></Card>
         </TabsContent>
 
