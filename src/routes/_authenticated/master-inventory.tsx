@@ -525,20 +525,41 @@ function MasterInventoryPage() {
                         <p className="font-medium text-sm">{d.products?.product_name ?? "-"}</p>
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">{d.qty_system}</TableCell>
-                      <TableCell className="text-right text-sm font-medium">
-                        {d.qty_actual}
-                        {d.qty_difference !== 0 && (
-                          <span className={d.qty_difference > 0 ? "text-green-600 text-xs ml-1" : "text-red-500 text-xs ml-1"}>
-                            {d.qty_difference > 0 ? "▲" : "▼"}{Math.abs(d.qty_difference)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-bold">
-                        <span className={d.qty_difference > 0 ? "text-green-600" : d.qty_difference < 0 ? "text-red-500" : "text-muted-foreground"}>
-                          {d.qty_difference > 0 ? `+${d.qty_difference}` : d.qty_difference}
-                        </span>
-                      </TableCell>
+                      {(() => {
+                        const sistemLama = d.qty_system;
+                        const sistemBaru = d.qty_system + d.qty_difference;
+                        const aktualLama = d.qty_system;
+                        const aktualBaru = d.qty_actual;
+                        const aktualDiff = aktualBaru - aktualLama;
+                        const selisih = aktualBaru - sistemBaru;
+                        return (
+                          <>
+                            <TableCell className="text-right text-xs text-muted-foreground">{sistemLama}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {sistemBaru}
+                              {d.qty_difference !== 0 && (
+                                <span className="text-xs ml-1 text-foreground">
+                                  {d.qty_difference > 0 ? "▲" : "▼"}{Math.abs(d.qty_difference)}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{aktualLama}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {aktualBaru}
+                              {aktualDiff !== 0 && (
+                                <span className="text-xs ml-1 text-foreground">
+                                  {aktualDiff > 0 ? "▲" : "▼"}{Math.abs(aktualDiff)}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-bold">
+                              <span className={selisih > 0 ? "text-green-600" : selisih < 0 ? "text-red-500" : "text-muted-foreground"}>
+                                {selisih > 0 ? `+${selisih}` : selisih}
+                              </span>
+                            </TableCell>
+                          </>
+                        );
+                      })()}
                     </TableRow>
                   ));
                 })}
