@@ -73,8 +73,14 @@ function ShiftsPage() {
       const tunai = (sales ?? []).filter((s: any) => s.payment_method === "TUNAI").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const qris = (sales ?? []).filter((s: any) => s.payment_method === "QRIS").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const transfer = (sales ?? []).filter((s: any) => s.payment_method === "TRANSFER").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
-      // Retur penjualan tunai — belum diimplementasi, default 0
-      const returTunai = 0;
+      // Retur penjualan — kas keluar (kembalikan uang ke customer)
+      const { data: salesReturns } = await supabase.from("sales_headers")
+        .select("grand_total")
+        .eq("transaction_status", "VOID")
+        .eq("payment_method", "RETUR")
+        .gte("created_at", from)
+        .is("deleted_at", null);
+      const returTunai = (salesReturns ?? []).reduce((a: number, r: any) => a + Number(r.grand_total), 0);
       // Pembelian tunai (LUNAS)
       const { data: purchases } = await supabase.from("purchase_headers")
         .select("grand_total, payment_status")
@@ -112,6 +118,7 @@ function ShiftsPage() {
         total_qris: shiftStats?.qris ?? 0,
         total_transfer: shiftStats?.transfer ?? 0,
         total_pembelian_tunai: shiftStats?.pembelianTunai ?? 0,
+        total_retur_tunai: shiftStats?.returTunai ?? 0,
       } as never).eq("id", activeShift.id);
       if (error) throw error;
     },
@@ -169,6 +176,7 @@ function ShiftsPage() {
             <TableHead className="text-right">QRIS</TableHead>
             <TableHead className="text-right">Transfer</TableHead>
             <TableHead className="text-right">Pembelian</TableHead>
+            <TableHead className="text-right">Retur Jual</TableHead>
             <TableHead className="text-right">Expected</TableHead>
             <TableHead className="text-right">Kas Aktual</TableHead>
             <TableHead className="text-right">Selisih</TableHead>
@@ -186,6 +194,7 @@ function ShiftsPage() {
                 <TableCell className="text-right text-blue-600">{s.total_qris ? formatRp(s.total_qris) : "-"}</TableCell>
                 <TableCell className="text-right text-purple-600">{s.total_transfer ? formatRp(s.total_transfer) : "-"}</TableCell>
                 <TableCell className="text-right text-red-500">{s.total_pembelian_tunai ? formatRp(s.total_pembelian_tunai) : "-"}</TableCell>
+                <TableCell className="text-right text-orange-500">{(s as any).total_retur_tunai ? formatRp((s as any).total_retur_tunai) : "-"}</TableCell>
                 <TableCell className="text-right">{s.expected_cash ? formatRp(s.expected_cash) : "-"}</TableCell>
                 <TableCell className="text-right">{s.closing_cash ? formatRp(s.closing_cash) : "-"}</TableCell>
                 <TableCell className={["text-right font-bold", s.cash_difference < 0 ? "text-red-500" : s.cash_difference > 0 ? "text-green-600" : ""].join(" ")}>{s.cash_difference !== null && s.cash_difference !== undefined ? formatRp(s.cash_difference) : "-"}</TableCell>
@@ -222,6 +231,7 @@ function ShiftsPage() {
             <div className="flex justify-between text-blue-600"><span>Penjualan QRIS</span><span>{formatRp(shiftStats?.qris ?? 0)}</span></div>
             <div className="flex justify-between text-purple-600"><span>Penjualan Transfer</span><span>{formatRp(shiftStats?.transfer ?? 0)}</span></div>
             <div className="flex justify-between text-red-500"><span>- Retur Tunai</span><span>{formatRp(shiftStats?.returTunai ?? 0)}</span></div>
+            <div className="flex justify-between text-orange-500"><span>- Retur Penjualan</span><span>{formatRp(shiftStats?.returTunai ?? 0)}</span></div>
             <div className="flex justify-between text-red-500"><span>- Pembelian Tunai</span><span>{formatRp(shiftStats?.pembelianTunai ?? 0)}</span></div>
             <div className="flex justify-between font-bold border-t pt-2"><span>Expected Kas</span><span>{formatRp(expectedKas)}</span></div>
             <div className="pt-2 space-y-1.5">
