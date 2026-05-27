@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Clock, DollarSign } from "lucide-react";
+import { Clock, DollarSign, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,6 +18,8 @@ export const Route = createFileRoute("/_authenticated/shifts")({ component: Shif
 
 type Shift = { id: string; open_time: string; close_time: string | null; opening_cash: number; closing_cash: number; expected_cash: number; cash_difference: number; shift_status: string };
 
+const PAGE_SIZE = 10;
+
 function ShiftsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -25,22 +27,32 @@ function ShiftsPage() {
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
   const [openingCash, setOpeningCash] = useState("0");
   const [closingCash, setClosingCash] = useState("0");
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { data: shifts = [] } = useQuery({
-    queryKey: ["shifts"],
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: allShifts = [] } = useQuery({
+    queryKey: ["shifts", filterFrom, filterTo],
     queryFn: async () => {
-      const { data, error } = await supabase.from("cashier_shifts").select("*").order("open_time", { ascending: false }).limit(20);
+      let q = supabase.from("cashier_shifts").select("*").order("open_time", { ascending: false });
+      if (filterFrom) q = q.gte("open_time", filterFrom + "T00:00:00");
+      if (filterTo) q = q.lte("open_time", filterTo + "T23:59:59");
+      const { data, error } = await q;
       if (error) throw error;
       return data as Shift[];
     },
   });
 
-  const activeShift = shifts.find((s) => s.shift_status === "OPEN");
+  const totalPages = Math.max(1, Math.ceil(allShifts.length / PAGE_SIZE));
+  const shifts = allShifts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const activeShift = allShifts.find((s) => s.shift_status === "OPEN");
 
   const { data: todaySales = 0 } = useQuery({
     queryKey: ["today-sales"],
     queryFn: async () => {
-      const today = new Date().toISOString().split("T")[0];
       const { data } = await supabase.from("sales_headers").select("grand_total").gte("transaction_date", today).is("deleted_at", null);
       return (data ?? []).reduce((s: number, r: { grand_total: number }) => s + Number(r.grand_total), 0);
     },
@@ -68,31 +80,45 @@ function ShiftsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  function resetFilter() { setFilterFrom(""); setFilterTo(""); setPage(1); }
+
+  const isFiltered = filterFrom || filterTo;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Status Shift</CardTitle></CardHeader>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Status Shift</CardTitle></CardHeader>
           <CardContent><Badge variant={activeShift ? "default" : "secondary"} className="text-base px-3 py-1">{activeShift ? "SHIFT AKTIF" : "TIDAK ADA SHIFT"}</Badge></CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Penjualan Hari Ini</CardTitle></CardHeader>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Penjualan Hari Ini</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-600">{formatRp(todaySales)}</p></CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Kas Awal</CardTitle></CardHeader>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Kas Awal</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{activeShift ? formatRp(activeShift.opening_cash) : "-"}</p></CardContent>
         </Card>
       </div>
 
-      <div className="flex gap-2">
-        {!activeShift && (
-          <Button onClick={() => setOpenShiftOpen(true)} className="gap-2"><Clock className="h-4 w-4" />Buka Shift</Button>
-        )}
-        {activeShift && (
-          <Button variant="destructive" onClick={() => setCloseShiftOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" />Tutup Shift</Button>
-        )}
+      <div className="flex gap-2 flex-wrap items-center justify-between">
+        <div className="flex gap-2">
+          {!activeShift && <Button onClick={() => setOpenShiftOpen(true)} className="gap-2"><Clock className="h-4 w-4" />Buka Shift</Button>}
+          {activeShift && <Button variant="destructive" onClick={() => setCloseShiftOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" />Tutup Shift</Button>}
+        </div>
+        <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter((v) => !v)}>
+          <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
+        </Button>
       </div>
+
+      {showFilter && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 pb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Dari Tanggal Buka</Label><Input type="date" value={filterFrom} onChange={(e) => { setFilterFrom(e.target.value); setPage(1); }} /></div>
+              <div className="space-y-1.5"><Label>Sampai Tanggal Buka</Label><Input type="date" value={filterTo} onChange={(e) => { setFilterTo(e.target.value); setPage(1); }} /></div>
+            </div>
+            {isFiltered && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={resetFilter}>Reset Filter</Button>}
+          </CardContent>
+        </Card>
+      )}
 
       <Card><CardContent className="p-0">
         <Table>
@@ -112,15 +138,21 @@ function ShiftsPage() {
             ))}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+            <span>Halaman {page} dari {totalPages} ({allShifts.length} data)</span>
+            <div className="flex gap-1">
+              <Button size="icon" variant="ghost" disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+          </div>
+        )}
       </CardContent></Card>
 
       <Dialog open={openShiftOpen} onOpenChange={setOpenShiftOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Buka Shift Baru</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>Kas Awal (Rp)</Label>
-            <Input type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} autoFocus />
-          </div>
+          <div className="space-y-3"><Label>Kas Awal (Rp)</Label><Input type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} autoFocus /></div>
           <DialogFooter><Button onClick={() => openShift.mutate()} disabled={openShift.isPending}>{openShift.isPending ? "Membuka..." : "Buka Shift"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Trash2, ShoppingCart, PauseCircle, PlayCircle, XCircle, Printer } from "lucide-react";
+import { Trash2, ShoppingCart, PauseCircle, PlayCircle, XCircle, Printer, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
@@ -104,15 +104,31 @@ function SalesPOS() {
     },
   });
 
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFrom, setHistoryFrom] = useState("");
+  const [historyTo, setHistoryTo] = useState("");
+  const [showHistoryFilter, setShowHistoryFilter] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const HISTORY_PAGE_SIZE = 10;
+
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
-    queryKey: ["recent-sales"],
+    queryKey: ["recent-sales", historySearch, historyFrom, historyTo],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at").is("deleted_at", null).order("created_at", { ascending: false }).limit(20);
+      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
+      if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
+      if (historyTo) q = q.lte("created_at", historyTo + "T23:59:59");
+      const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      const all = data ?? [];
+      if (historySearch) return all.filter((s) => s.sales_number.toLowerCase().includes(historySearch.toLowerCase()));
+      return all;
     },
     staleTime: 0,
   });
+
+  const historyTotalPages = Math.max(1, Math.ceil(recentSales.length / HISTORY_PAGE_SIZE));
+  const pagedSales = recentSales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
+  const isHistoryFiltered = historySearch || historyFrom || historyTo;
 
   const selectedCustomerType = useMemo(() => {
     if (customerId === "none") return "RETAIL";
@@ -409,28 +425,56 @@ function SalesPOS() {
         </TabsContent>
 
         <TabsContent value="history">
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Metode</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
-              <TableBody>
-                {recentSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
-                {recentSales.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-xs">{s.sales_number}</TableCell>
-                    <TableCell className="text-xs">{new Date(s.created_at).toLocaleString("id-ID")}</TableCell>
-                    <TableCell className="text-xs">{s.payment_method}</TableCell>
-                    <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
-                    <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
-                    <TableCell>
-                      {s.transaction_status === "SELESAI" && (
-                        <Button size="icon" variant="ghost" title="Void" onClick={() => setVoidDialog(s.id)}><XCircle className="h-4 w-4 text-destructive" /></Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 items-center justify-between">
+              <Input placeholder="Cari no. transaksi..." value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }} className="max-w-xs" />
+              <Button variant={isHistoryFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowHistoryFilter((v) => !v)}>
+                <SlidersHorizontal className="h-4 w-4" />Filter{isHistoryFiltered ? " (aktif)" : ""}
+              </Button>
+            </div>
+            {showHistoryFilter && (
+              <Card className="border-dashed">
+                <CardContent className="pt-4 pb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={historyFrom} onChange={(e) => { setHistoryFrom(e.target.value); setHistoryPage(1); }} /></div>
+                    <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={historyTo} onChange={(e) => { setHistoryTo(e.target.value); setHistoryPage(1); }} /></div>
+                  </div>
+                  {isHistoryFiltered && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setHistorySearch(""); setHistoryFrom(""); setHistoryTo(""); setHistoryPage(1); }}>Reset Filter</Button>}
+                </CardContent>
+              </Card>
+            )}
+            <Card><CardContent className="p-0">
+              <Table>
+                <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Metode</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
+                <TableBody>
+                  {pagedSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
+                  {pagedSales.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-mono text-xs">{s.sales_number}</TableCell>
+                      <TableCell className="text-xs">{new Date(s.created_at).toLocaleString("id-ID")}</TableCell>
+                      <TableCell className="text-xs">{s.payment_method}</TableCell>
+                      <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
+                      <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
+                      <TableCell>
+                        {s.transaction_status === "SELESAI" && (
+                          <Button size="icon" variant="ghost" title="Void" onClick={() => setVoidDialog(s.id)}><XCircle className="h-4 w-4 text-destructive" /></Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {historyTotalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                  <span>Halaman {historyPage} dari {historyTotalPages} ({recentSales.length} data)</span>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" disabled={historyPage === 1} onClick={() => setHistoryPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" disabled={historyPage === historyTotalPages} onClick={() => setHistoryPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              )}
+            </CardContent></Card>
+          </div>
         </TabsContent>
       </Tabs>
 
