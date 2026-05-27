@@ -22,7 +22,7 @@ type PurchaseHeader = { id: string; purchase_number: string; transaction_date: s
 
 const PAGE_SIZE = 10;
 
-function exportCSV(data: PurchaseHeader[], filterInfo: string) {
+function exportCSV(data: PurchaseHeader[], filterInfo: string, filterFrom: string, filterTo: string) {
   const rows: string[] = [];
   rows.push("Laporan Pembelian");
   rows.push(filterInfo);
@@ -62,7 +62,11 @@ function exportCSV(data: PurchaseHeader[], filterInfo: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `laporan-pembelian-${new Date().toISOString().slice(0, 10)}.csv`;
+  let filename = "laporan-pembelian";
+  if (filterFrom && filterTo) filename += `-${filterFrom}_sd_${filterTo}`;
+  else if (filterFrom) filename += `-dari-${filterFrom}`;
+  else if (filterTo) filename += `-sd-${filterTo}`;
+  a.download = filename + ".csv";
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -201,7 +205,7 @@ function PurchasesPage() {
           <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter((v) => !v)}>
             <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => exportCSV(filtered, buildFilterInfo())}>
+          <Button variant="outline" className="gap-2" onClick={() => exportCSV(filtered, buildFilterInfo(), filterFrom, filterTo)}>
             <Download className="h-4 w-4" />Export CSV
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
