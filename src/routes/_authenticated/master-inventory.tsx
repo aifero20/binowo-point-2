@@ -207,7 +207,7 @@ function MasterInventoryPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { toast.success("Barang disimpan"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); setOpenProduct(false); setEditing(null); },
+    onSuccess: () => { toast.success("Barang disimpan"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); qc.invalidateQueries({ queryKey: ["inventory-movements"] }); setOpenProduct(false); setEditing(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
