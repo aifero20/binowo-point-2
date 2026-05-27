@@ -546,7 +546,6 @@ function MasterInventoryPage() {
             <div />
             <Dialog open={openTransfer} onOpenChange={setOpenTransfer}>
               <Button size="lg" onClick={() => toast.info("Layanan ini belum tersedia")} type="button"><Plus className="h-4 w-4 mr-1" />Transfer Stok</Button>
-              <span style={{display:"none"}}>
               <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>Transfer Stok Antar Gudang</DialogTitle></DialogHeader>
                 <div className="grid md:grid-cols-2 gap-4">
