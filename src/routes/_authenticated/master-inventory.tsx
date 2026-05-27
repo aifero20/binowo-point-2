@@ -526,29 +526,21 @@ function MasterInventoryPage() {
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
                       {(() => {
-                        const sistemLama = d.qty_system;
-                        const sistemBaru = d.qty_system + d.qty_difference;
-                        const aktualLama = d.qty_system;
-                        const aktualBaru = d.qty_actual;
-                        const aktualDiff = aktualBaru - aktualLama;
-                        const selisih = aktualBaru - sistemBaru;
+                        const sistemSebelum = d.qty_system;
+                        const sistemSesudah = d.qty_system;
+                        const fisikSebelum = d.qty_system;
+                        const fisikSesudah = d.qty_actual;
+                        const selisih = d.qty_difference;
                         return (
                           <>
-                            <TableCell className="text-right text-xs text-muted-foreground">{sistemLama}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">{sistemSesudah}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{fisikSebelum}</TableCell>
                             <TableCell className="text-right text-sm font-medium">
-                              {sistemBaru}
-                              {d.qty_difference !== 0 && (
+                              {fisikSesudah}
+                              {selisih !== 0 && (
                                 <span className="text-xs ml-1 text-foreground">
-                                  {d.qty_difference > 0 ? "▲" : "▼"}{Math.abs(d.qty_difference)}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">{aktualLama}</TableCell>
-                            <TableCell className="text-right text-sm font-medium">
-                              {aktualBaru}
-                              {aktualDiff !== 0 && (
-                                <span className="text-xs ml-1 text-foreground">
-                                  {aktualDiff > 0 ? "▲" : "▼"}{Math.abs(aktualDiff)}
+                                  {selisih > 0 ? "▲" : "▼"}{Math.abs(selisih)}
                                 </span>
                               )}
                             </TableCell>
