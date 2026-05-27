@@ -526,16 +526,17 @@ function MasterInventoryPage() {
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
                       {(() => {
-                        const sistemSebelum = d.qty_system_before || d.qty_system;
+                        const hasHistory = d.qty_system_before > 0;
+                        const sistemSebelum = hasHistory ? d.qty_system_before : null;
                         const sistemSesudah = d.qty_system;
-                        const aktualSebelum = d.qty_system_before || d.qty_system;
+                        const aktualSebelum = hasHistory ? d.qty_system_before : null;
                         const aktualSesudah = d.qty_actual;
                         const selisih = d.qty_actual - d.qty_system;
                         return (
                           <>
-                            <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum ?? <span className="text-muted-foreground">-</span>}</TableCell>
                             <TableCell className="text-right text-sm font-medium">{sistemSesudah}</TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">{aktualSebelum}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{aktualSebelum ?? <span className="text-muted-foreground">-</span>}</TableCell>
                             <TableCell className="text-right text-sm font-medium">
                               {aktualSesudah}
                               {selisih !== 0 && (
