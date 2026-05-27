@@ -104,9 +104,11 @@ function SalesPOS() {
     },
   });
 
-  const [historySearch, setHistorySearch] = useState("");
   const [historyFrom, setHistoryFrom] = useState("");
   const [historyTo, setHistoryTo] = useState("");
+  const [historyFilterCustomer, setHistoryFilterCustomer] = useState("");
+  const [historyFilterKasir, setHistoryFilterKasir] = useState("");
+  const [historyFilterMethod, setHistoryFilterMethod] = useState("ALL");
   const [showHistoryFilter, setShowHistoryFilter] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const HISTORY_PAGE_SIZE = 10;
@@ -426,8 +428,7 @@ function SalesPOS() {
 
         <TabsContent value="history">
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-2 items-center justify-between">
-              <Input placeholder="Cari no. transaksi..." value={historySearch} onChange={(e) => { setHistorySearch(e.target.value); setHistoryPage(1); }} className="max-w-xs" />
+            <div className="flex justify-end">
               <Button variant={isHistoryFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowHistoryFilter((v) => !v)}>
                 <SlidersHorizontal className="h-4 w-4" />Filter{isHistoryFiltered ? " (aktif)" : ""}
               </Button>
@@ -438,20 +439,35 @@ function SalesPOS() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={historyFrom} onChange={(e) => { setHistoryFrom(e.target.value); setHistoryPage(1); }} /></div>
                     <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={historyTo} onChange={(e) => { setHistoryTo(e.target.value); setHistoryPage(1); }} /></div>
+                    <div className="space-y-1.5"><Label>Nama Customer</Label><Input placeholder="Cari customer..." value={historyFilterCustomer} onChange={(e) => { setHistoryFilterCustomer(e.target.value); setHistoryPage(1); }} /></div>
+                    <div className="space-y-1.5"><Label>Nama Kasir</Label><Input placeholder="Cari kasir..." value={historyFilterKasir} onChange={(e) => { setHistoryFilterKasir(e.target.value); setHistoryPage(1); }} /></div>
+                    <div className="space-y-1.5 sm:col-span-2"><Label>Metode Pembayaran</Label>
+                      <Select value={historyFilterMethod} onValueChange={(v) => { setHistoryFilterMethod(v); setHistoryPage(1); }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Semua Metode</SelectItem>
+                          <SelectItem value="TUNAI">Tunai</SelectItem>
+                          <SelectItem value="TRANSFER">Transfer</SelectItem>
+                          <SelectItem value="QRIS">QRIS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  {isHistoryFiltered && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setHistorySearch(""); setHistoryFrom(""); setHistoryTo(""); setHistoryPage(1); }}>Reset Filter</Button>}
+                  {isHistoryFiltered && <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground" onClick={() => { setHistoryFrom(""); setHistoryTo(""); setHistoryFilterCustomer(""); setHistoryFilterKasir(""); setHistoryFilterMethod("ALL"); setHistoryPage(1); }}>Reset Filter</Button>}
                 </CardContent>
               </Card>
             )}
             <Card><CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Metode</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Customer</TableHead><TableHead>Kasir</TableHead><TableHead>Metode</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
                 <TableBody>
-                  {pagedSales.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
+                  {pagedSales.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
                   {pagedSales.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-mono text-xs">{s.sales_number}</TableCell>
                       <TableCell className="text-xs">{new Date(s.created_at).toLocaleString("id-ID")}</TableCell>
+                      <TableCell className="text-xs">{(s as any).customers?.customer_name ?? <span className="text-muted-foreground">Umum</span>}</TableCell>
+                      <TableCell className="text-xs">{(s as any).users?.full_name ?? "-"}</TableCell>
                       <TableCell className="text-xs">{s.payment_method}</TableCell>
                       <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
                       <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
@@ -466,7 +482,7 @@ function SalesPOS() {
               </Table>
               {historyTotalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
-                  <span>Halaman {historyPage} dari {historyTotalPages} ({recentSales.length} data)</span>
+                  <span>Halaman {historyPage} dari {historyTotalPages} ({filteredSales.length} data)</span>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" disabled={historyPage === 1} onClick={() => setHistoryPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" disabled={historyPage === historyTotalPages} onClick={() => setHistoryPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
