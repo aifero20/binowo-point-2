@@ -116,18 +116,24 @@ function SalesPOS() {
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
     queryKey: ["recent-sales", historyFrom, historyTo],
     queryFn: async () => {
-      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, customers(customer_name), users!cashier_id(full_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
+      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, cashier_id, customers(customer_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
       if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
       if (historyTo) q = q.lte("created_at", historyTo + "T23:59:59");
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      const sales = data ?? [];
+      if (sales.length === 0) return [];
+      const cashierIds = [...new Set(sales.map((s: any) => s.cashier_id).filter(Boolean))];
+      const { data: kasirData } = await supabase.from("users").select("id, full_name").in("id", cashierIds);
+      const kasirMap: Record<string, string> = {};
+      (kasirData ?? []).forEach((u: any) => { kasirMap[u.id] = u.full_name; });
+      return sales.map((s: any) => ({ ...s, kasir_name: kasirMap[s.cashier_id] ?? "-" }));
     },
     staleTime: 0,
   });
   const filteredSales = recentSales.filter((s: any) => {
     const cust = s.customers?.customer_name ?? "";
-    const kasir = s.users?.full_name ?? "";
+    const kasir = s.kasir_name ?? "";
     if (historyFilterCustomer && !cust.toLowerCase().includes(historyFilterCustomer.toLowerCase())) return false;
     if (historyFilterKasir && !kasir.toLowerCase().includes(historyFilterKasir.toLowerCase())) return false;
     if (historyFilterMethod !== "ALL" && s.payment_method !== historyFilterMethod) return false;
@@ -472,7 +478,7 @@ function SalesPOS() {
                       <TableCell className="font-mono text-xs">{s.sales_number}</TableCell>
                       <TableCell className="text-xs">{new Date(s.created_at).toLocaleString("id-ID")}</TableCell>
                       <TableCell className="text-xs">{(s as any).customers?.customer_name ?? <span className="text-muted-foreground">Umum</span>}</TableCell>
-                      <TableCell className="text-xs">{(s as any).users?.full_name ?? "-"}</TableCell>
+                      <TableCell className="text-xs">{(s as any).kasir_name ?? "-"}</TableCell>
                       <TableCell className="text-xs">{s.payment_method}</TableCell>
                       <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
                       <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
