@@ -46,8 +46,13 @@ function ActivityLogsPage() {
   const { data: allLogs = [], isLoading } = useQuery({
     queryKey: ["activity-logs", filterType, filterTable, filterUser, filterFrom, filterTo],
     queryFn: async () => {
+      // Fetch users map dulu
+      const { data: usersData } = await supabase.from("users").select("id, full_name");
+      const userMap: Record<string, string> = {};
+      (usersData ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
+
       let q = supabase.from("activity_logs")
-        .select("id, activity_time, activity_type, table_name, description, user_id, users(full_name)")
+        .select("id, activity_time, activity_type, table_name, description, user_id")
         .order("activity_time", { ascending: false })
         .limit(500);
       if (filterType !== "ALL") q = q.eq("activity_type", filterType);
@@ -57,7 +62,7 @@ function ActivityLogsPage() {
       if (filterTo) q = q.lte("activity_time", filterTo + "T23:59:59");
       const { data, error } = await q;
       if (error) throw error;
-      return data as Log[];
+      return (data ?? []).map((l: any) => ({ ...l, _userName: userMap[l.user_id] ?? "-" }));
     },
   });
 
@@ -142,7 +147,7 @@ function ActivityLogsPage() {
             {logs.map((l) => (
               <TableRow key={l.id}>
                 <TableCell className="text-xs whitespace-nowrap">{new Date(l.activity_time).toLocaleString("id-ID")}</TableCell>
-                <TableCell className="text-sm font-medium">{(l.users as any)?.full_name ?? "-"}</TableCell>
+                <TableCell className="text-sm font-medium">{(l as any)._userName ?? "-"}</TableCell>
                 <TableCell><Badge variant={TYPE_COLORS[l.activity_type] ?? "secondary"} className="text-xs">{l.activity_type}</Badge></TableCell>
                 <TableCell className="text-xs text-muted-foreground">{l.table_name ?? "-"}</TableCell>
                 <TableCell className="text-sm">{l.description ?? "-"}</TableCell>
