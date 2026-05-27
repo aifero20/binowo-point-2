@@ -116,7 +116,7 @@ function SalesPOS() {
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
     queryKey: ["recent-sales", historyFrom, historyTo],
     queryFn: async () => {
-      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, customers(customer_name), users(full_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
+      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, customers(customer_name), users!cashier_id(full_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
       if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
       if (historyTo) q = q.lte("created_at", historyTo + "T23:59:59");
       const { data, error } = await q;
