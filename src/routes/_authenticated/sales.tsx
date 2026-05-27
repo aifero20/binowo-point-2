@@ -116,20 +116,26 @@ function SalesPOS() {
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
     queryKey: ["recent-sales", historyFrom, historyTo],
     queryFn: async () => {
-      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
+      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, customers(customer_name), users(full_name)").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
       if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
       if (historyTo) q = q.lte("created_at", historyTo + "T23:59:59");
       const { data, error } = await q;
       if (error) throw error;
-      const all = data ?? [];
-      return all;
+      return data ?? [];
     },
     staleTime: 0,
   });
-
+  const filteredSales = recentSales.filter((s: any) => {
+    const cust = s.customers?.customer_name ?? "";
+    const kasir = s.users?.full_name ?? "";
+    if (historyFilterCustomer && !cust.toLowerCase().includes(historyFilterCustomer.toLowerCase())) return false;
+    if (historyFilterKasir && !kasir.toLowerCase().includes(historyFilterKasir.toLowerCase())) return false;
+    if (historyFilterMethod !== "ALL" && s.payment_method !== historyFilterMethod) return false;
+    return true;
+  });
   const historyTotalPages = Math.max(1, Math.ceil(filteredSales.length / HISTORY_PAGE_SIZE));
   const pagedSales = filteredSales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
-  const isHistoryFiltered = historyFrom || historyTo;
+  const isHistoryFiltered = historyFrom || historyTo || historyFilterCustomer || historyFilterKasir || historyFilterMethod !== "ALL";
 
   const selectedCustomerType = useMemo(() => {
     if (customerId === "none") return "RETAIL";
