@@ -497,8 +497,8 @@ function MasterInventoryPage() {
                   <TableHead>Tanggal</TableHead>
                   <TableHead>Gudang</TableHead>
                   <TableHead>Barang</TableHead>
-                  <TableHead className="text-right">Stok Sistem</TableHead>
-                  <TableHead className="text-right">Stok Aktual</TableHead>
+                  <TableHead className="text-right">Sebelum</TableHead>
+                  <TableHead className="text-right">Sesudah</TableHead>
                   <TableHead className="text-right">Selisih</TableHead>
                 </TableRow>
               </TableHeader>
@@ -526,7 +526,14 @@ function MasterInventoryPage() {
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">{d.qty_system}</TableCell>
-                      <TableCell className="text-right text-sm font-medium">{d.qty_actual}</TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {d.qty_actual}
+                        {d.qty_difference !== 0 && (
+                          <span className={d.qty_difference > 0 ? "text-green-600 text-xs ml-1" : "text-red-500 text-xs ml-1"}>
+                            {d.qty_difference > 0 ? "▲" : "▼"}{Math.abs(d.qty_difference)}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right text-sm font-bold">
                         <span className={d.qty_difference > 0 ? "text-green-600" : d.qty_difference < 0 ? "text-red-500" : "text-muted-foreground"}>
                           {d.qty_difference > 0 ? `+${d.qty_difference}` : d.qty_difference}
