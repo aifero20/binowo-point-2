@@ -58,7 +58,7 @@ function SalesPOS() {
     syncPendingSales();
     return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
   }, []);
-  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string } | null>(null);
+  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string; method: string } | null>(null);
 
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
@@ -199,7 +199,7 @@ function SalesPOS() {
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
       await supabase.from("stock_movements").insert(cart.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "sale", reference_number: sales_number, qty_out: l.qty, created_by: user!.id })) as never);
       const custName = customers.find((c) => c.id === customerId)?.customer_name ?? "Umum / Walk-in";
-      return { no: sales_number, items: [...cart], total: subtotal, bayar: paymentAmount, kembali: change, customerName: custName };
+      return { no: sales_number, items: [...cart], total: subtotal, bayar: paymentAmount, kembali: change, customerName: custName, method: paymentMethod };
     },
     onSuccess: (data) => {
       toast.success(`Transaksi ${data.no} berhasil`);
@@ -543,7 +543,7 @@ function SalesPOS() {
               ))}
               <div className="border-t border-dashed my-2" />
               <div className="flex justify-between font-bold"><span>TOTAL</span><span>{formatRp(printData.total)}</span></div>
-              <div className="flex justify-between"><span>Bayar</span><span>{formatRp(printData.bayar)}</span></div>
+              <div className="flex justify-between"><span>Bayar <span className="text-muted-foreground text-xs">({printData.method})</span></span><span>{formatRp(printData.bayar)}</span></div>
               <div className="flex justify-between"><span>Kembali</span><span>{formatRp(printData.kembali)}</span></div>
               <div className="border-t border-dashed my-2" />
               <p className="text-center">Harga Sudah Termasuk PPN</p>
