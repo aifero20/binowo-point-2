@@ -20,26 +20,27 @@ const PAGE_SIZE = 10;
 
 function CustomersPage() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Customer | null>(null);
   const [open, setOpen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
+  const [filterName, setFilterName] = useState("");
+  const [filterCode, setFilterCode] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [filterType, setFilterType] = useState("ALL");
   const [page, setPage] = useState(1);
 
   const { data: allData = [] } = useQuery({
-    queryKey: ["customers", search],
+    queryKey: ["customers"],
     queryFn: async () => {
-      let q = supabase.from("customers").select("*").is("deleted_at", null).order("customer_name");
-      if (search) q = q.or(`customer_name.ilike.%${search}%,customer_code.ilike.%${search}%`);
-      const { data, error } = await q;
+      const { data, error } = await supabase.from("customers").select("*").is("deleted_at", null).order("customer_name");
       if (error) throw error;
       return data as Customer[];
     },
   });
 
   const filtered = allData.filter((c) => {
+    if (filterName && !c.customer_name.toLowerCase().includes(filterName.toLowerCase())) return false;
+    if (filterCode && !c.customer_code.toLowerCase().includes(filterCode.toLowerCase())) return false;
     if (filterCity && !c.city?.toLowerCase().includes(filterCity.toLowerCase())) return false;
     if (filterType !== "ALL" && c.customer_type !== filterType) return false;
     return true;
@@ -47,10 +48,9 @@ function CustomersPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const data = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const isFiltered = filterName || filterCode || filterCity || filterType !== "ALL";
 
-  const isFiltered = filterCity || filterType !== "ALL";
-
-  function resetFilter() { setFilterCity(""); setFilterType("ALL"); setPage(1); }
+  function resetFilter() { setFilterName(""); setFilterCode(""); setFilterCity(""); setFilterType("ALL"); setPage(1); }
 
   const save = useMutation({
     mutationFn: async (form: Partial<Customer>) => {
@@ -75,7 +75,7 @@ function CustomersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center justify-between">
-        <Input placeholder="Cari customer..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="max-w-sm" />
+        <p className="text-sm text-muted-foreground">{filtered.length} customer{isFiltered ? " (difilter)" : ""}</p>
         <div className="flex gap-2">
           <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter((v) => !v)}>
             <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
@@ -91,6 +91,8 @@ function CustomersPage() {
         <Card className="border-dashed">
           <CardContent className="pt-4 pb-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Nama Customer</Label><Input placeholder="Cari nama..." value={filterName} onChange={(e) => { setFilterName(e.target.value); setPage(1); }} /></div>
+              <div className="space-y-1.5"><Label>Kode Customer</Label><Input placeholder="Cari kode..." value={filterCode} onChange={(e) => { setFilterCode(e.target.value); setPage(1); }} /></div>
               <div className="space-y-1.5"><Label>Kota</Label><Input placeholder="Cari kota..." value={filterCity} onChange={(e) => { setFilterCity(e.target.value); setPage(1); }} /></div>
               <div className="space-y-1.5"><Label>Tipe Customer</Label>
                 <Select value={filterType} onValueChange={(v) => { setFilterType(v); setPage(1); }}>
