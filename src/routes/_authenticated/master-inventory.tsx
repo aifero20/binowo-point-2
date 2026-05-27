@@ -219,7 +219,7 @@ function MasterInventoryPage() {
       const { data: header, error: he } = await supabase.from("stock_adjustments").insert({ adjustment_number, warehouse_id: adjWarehouse, notes: adjNotes, created_by: user!.id } as never).select("id").single();
       if (he) throw he;
       const aid = (header as { id: string }).id;
-      await supabase.from("stock_adjustment_details").insert(adjLines.map((l) => ({ adjustment_id: aid, product_id: l.product_id, qty_system: l.qty_system, qty_actual: l.qty_actual, qty_difference: l.qty_actual - l.qty_system })) as never);
+      await supabase.from("stock_adjustment_details").insert(adjLines.map((l) => ({ adjustment_id: aid, product_id: l.product_id, qty_system_before: l.qty_system_before, qty_system: l.qty_system, qty_actual: l.qty_actual, qty_difference: l.qty_actual - l.qty_system })) as never);
       const movements = adjLines.filter((l) => l.qty_actual !== l.qty_system).map((l) => {
         const diff = l.qty_actual - l.qty_system;
         return { product_id: l.product_id, warehouse_id: adjWarehouse, transaction_type: "adjustment", reference_number: adjustment_number, qty_in: diff > 0 ? diff : 0, qty_out: diff < 0 ? Math.abs(diff) : 0, created_by: user!.id };
