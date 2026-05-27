@@ -194,6 +194,14 @@ function MasterInventoryPage() {
       if (editing) {
         const { error } = await supabase.from("products").update({ product_code: form.product_code, product_name: form.product_name, barcode: form.barcode, default_unit: form.default_unit, current_buy_price: form.current_buy_price, current_retail_price: form.current_retail_price, current_wholesale_price: form.current_wholesale_price, minimum_stock: form.minimum_stock, supplier_id: form.supplier_id } as never).eq("id", editing.product_id);
         if (error) throw error;
+        if (form.current_stock !== editing.current_stock) {
+          const diff = form.current_stock - editing.current_stock;
+          const adjNumber = "ADJ" + Date.now();
+          const { data: wh } = await supabase.from("warehouses").select("id").eq("is_active", true).order("warehouse_name").limit(1).single();
+          const whId = (wh as any)?.id;
+          const { error: me } = await supabase.from("stock_movements").insert({ product_id: editing.product_id, warehouse_id: whId, transaction_type: "adjustment", reference_number: adjNumber, qty_in: diff > 0 ? diff : 0, qty_out: diff < 0 ? Math.abs(diff) : 0, created_by: user!.id } as never);
+          if (me) throw me;
+        }
       } else {
         const { error } = await supabase.from("products").insert({ product_code: form.product_code, product_name: form.product_name, barcode: form.barcode, default_unit: form.default_unit, current_buy_price: form.current_buy_price, current_retail_price: form.current_retail_price, current_wholesale_price: form.current_wholesale_price, minimum_stock: form.minimum_stock, supplier_id: form.supplier_id, is_active: true } as never);
         if (error) throw error;
@@ -266,7 +274,7 @@ function MasterInventoryPage() {
           <TabsTrigger value="barang">Master Barang</TabsTrigger>
           <TabsTrigger value="harga">Riwayat Harga</TabsTrigger>
           <TabsTrigger value="movement">Movement Stok</TabsTrigger>
-          <TabsTrigger value="adjustment">Adjustment Stok</TabsTrigger>
+          
           <TabsTrigger value="transfer">Transfer Stok</TabsTrigger>
         </TabsList>
 
@@ -436,131 +444,6 @@ function MasterInventoryPage() {
           </CardContent></Card>
         </TabsContent>
 
-        {/* TAB ADJUSTMENT STOK */}
-        <TabsContent value="adjustment" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{adjustments.length} adjustment</p>
-            <Dialog open={openAdj} onOpenChange={setOpenAdj}>
-              <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" />Adjustment Stok</Button></DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader><DialogTitle>Adjustment Stok</DialogTitle></DialogHeader>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="space-y-1.5"><Label>Gudang *</Label>
-                      <Select value={adjWarehouse} onValueChange={setAdjWarehouse}>
-                        <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
-                        <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5"><Label>Catatan</Label><Input value={adjNotes} onChange={(e) => setAdjNotes(e.target.value)} placeholder="Alasan adjustment..." /></div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Cari Barang</Label>
-                    <Input autoFocus placeholder="Cari nama barang..." value={adjSearch} onChange={(e) => setAdjSearch(e.target.value)} />
-                    <div className="border rounded max-h-48 overflow-y-auto divide-y">
-                      {products.filter((p) => !adjSearch || p.product_name.toLowerCase().includes(adjSearch.toLowerCase())).slice(0, 10).map((p) => (
-                        <div key={p.product_id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setAdjLines((prev) => prev.find((l) => l.product_id === p.product_id) ? prev : [...prev, { product_id: p.product_id, product_name: p.product_name, unit_name: p.default_unit, qty_system_before: p.current_stock, qty_system: p.current_stock, qty_actual: p.current_stock }])}>
-                          <span>{p.product_name}</span>
-                          <span className="text-muted-foreground text-xs">Stok: {p.current_stock} {p.default_unit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {adjLines.length > 0 && (
-                  <div className="border rounded divide-y mt-2">
-                    <div className="grid grid-cols-[1fr_100px_100px_80px_40px] gap-2 p-2 text-xs font-medium text-muted-foreground">
-                      <span>Barang</span><span className="text-center">Stok Sistem</span><span className="text-center">Stok Aktual</span><span className="text-center">Selisih</span><span />
-                    </div>
-                    {adjLines.map((l, i) => (
-                      <div key={i} className="p-2 grid grid-cols-[1fr_100px_100px_80px_40px] gap-2 items-center text-sm">
-                        <span className="truncate font-medium">{l.product_name}</span>
-                        <Input type="number" value={l.qty_system} onChange={(e) => setAdjLines((ls) => ls.map((x, j) => j === i ? { ...x, qty_system: Number(e.target.value) } : x))} className="h-8 text-center" />
-                        <Input type="number" value={l.qty_actual} onChange={(e) => setAdjLines((ls) => ls.map((x, j) => j === i ? { ...x, qty_actual: Number(e.target.value) } : x))} className="h-8 text-center" />
-                        <span className={["text-center font-bold text-sm", (l.qty_actual - l.qty_system) > 0 ? "text-green-600" : (l.qty_actual - l.qty_system) < 0 ? "text-red-500" : ""].join(" ")}>
-                          {l.qty_actual - l.qty_system > 0 ? "+" : ""}{l.qty_actual - l.qty_system}
-                        </span>
-                        <Button size="icon" variant="ghost" onClick={() => setAdjLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <DialogFooter><Button size="lg" onClick={() => saveAdjustment.mutate()} disabled={saveAdjustment.isPending}>{saveAdjustment.isPending ? "Menyimpan..." : "Simpan Adjustment"}</Button></DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <Card><CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>No. Adjustment</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Gudang</TableHead>
-                  <TableHead>Barang</TableHead>
-                  <TableHead className="text-right">Sistem Sebelum</TableHead><TableHead className="text-right">Sistem Sesudah</TableHead>
-                  <TableHead className="text-right">Aktual Sebelum</TableHead><TableHead className="text-right">Aktual Sesudah</TableHead>
-                  <TableHead className="text-right">Selisih</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {adjustments.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada adjustment.</TableCell></TableRow>}
-                {(adjustments as any[]).map((a) => {
-                  const details = a.stock_adjustment_details ?? [];
-                  if (details.length === 0) {
-                    return (
-                      <TableRow key={a.id}>
-                        <TableCell className="font-mono text-xs">{a.adjustment_number}</TableCell>
-                        <TableCell className="text-xs">{new Date(a.adjustment_date).toLocaleDateString("id-ID")}</TableCell>
-                        <TableCell>{a.warehouses?.warehouse_name ?? "-"}</TableCell>
-                        <TableCell colSpan={4} className="text-muted-foreground text-xs">-</TableCell>
-                      </TableRow>
-                    );
-                  }
-                  return details.map((d: any, i: number) => (
-                    <TableRow key={`${a.id}-${i}`} className={i > 0 ? "border-t-0" : ""}>
-                      <TableCell className="font-mono text-xs">{i === 0 ? a.adjustment_number : ""}</TableCell>
-                      <TableCell className="text-xs">{i === 0 ? new Date(a.adjustment_date).toLocaleDateString("id-ID") : ""}</TableCell>
-                      <TableCell className="text-xs">{i === 0 ? (a.warehouses?.warehouse_name ?? "-") : ""}</TableCell>
-                      <TableCell>
-                        <p className="font-medium text-sm">{d.products?.product_name ?? "-"}</p>
-                        <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
-                      </TableCell>
-                      {(() => {
-                        const hasHistory = d.qty_system_before > 0;
-                        const sistemSebelum = hasHistory ? d.qty_system_before : null;
-                        const sistemSesudah = d.qty_system;
-                        const aktualSebelum = hasHistory ? d.qty_system_before : null;
-                        const aktualSesudah = d.qty_actual;
-                        const selisih = d.qty_actual - d.qty_system;
-                        return (
-                          <>
-                            <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum ?? <span className="text-muted-foreground">-</span>}</TableCell>
-                            <TableCell className="text-right text-sm font-medium">{sistemSesudah}</TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">{aktualSebelum ?? <span className="text-muted-foreground">-</span>}</TableCell>
-                            <TableCell className="text-right text-sm font-medium">
-                              {aktualSesudah}
-                              {selisih !== 0 && (
-                                <span className="text-xs ml-1 text-foreground">
-                                  {selisih > 0 ? "▲" : "▼"}{Math.abs(selisih)}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-bold">
-                              <span className={selisih > 0 ? "text-green-600" : selisih < 0 ? "text-red-500" : "text-muted-foreground"}>
-                                {selisih > 0 ? `+${selisih}` : selisih}
-                              </span>
-                            </TableCell>
-                          </>
-                        );
-                      })()}
-                    </TableRow>
-                  ));
-                })}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
-        </TabsContent>
-
         {/* TAB TRANSFER STOK */}
         <TabsContent value="transfer" className="space-y-3">
           <div className="flex items-center justify-between">
@@ -635,13 +518,13 @@ function MasterInventoryPage() {
   );
 }
 
-type ProductFormData = { product_code: string; product_name: string; barcode: string | null; default_unit: string; current_buy_price: number; current_retail_price: number; current_wholesale_price: number; minimum_stock: number; supplier_id: string | null };
+type ProductFormData = { product_code: string; product_name: string; barcode: string | null; default_unit: string; current_buy_price: number; current_retail_price: number; current_wholesale_price: number; minimum_stock: number; current_stock: number; supplier_id: string | null };
 
 function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Product | null; suppliers: { id: string; supplier_name: string }[]; onSubmit: (f: ProductFormData) => void; loading: boolean }) {
-  const [form, setForm] = useState<ProductFormData>({ product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, supplier_id: null });
+  const [form, setForm] = useState<ProductFormData>({ product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, current_stock: 0, supplier_id: null });
   useEffect(() => {
-    if (editing) setForm({ product_code: editing.product_code, product_name: editing.product_name, barcode: editing.barcode ?? "", default_unit: editing.default_unit, current_buy_price: editing.current_buy_price, current_retail_price: editing.current_retail_price, current_wholesale_price: editing.current_wholesale_price, minimum_stock: editing.minimum_stock, supplier_id: editing.supplier_id });
-    else setForm({ product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, supplier_id: null });
+    if (editing) setForm({ product_code: editing.product_code, product_name: editing.product_name, barcode: editing.barcode ?? "", default_unit: editing.default_unit, current_buy_price: editing.current_buy_price, current_retail_price: editing.current_retail_price, current_wholesale_price: editing.current_wholesale_price, minimum_stock: editing.minimum_stock, current_stock: editing.current_stock, supplier_id: editing.supplier_id });
+    else setForm({ product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, current_stock: 0, supplier_id: null });
   }, [editing]);
   const n = (v: string) => Number(v) || 0;
   return (
@@ -654,6 +537,7 @@ function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Produ
           <div className="space-y-1.5 col-span-2"><Label>Nama Barang *</Label><Input required value={form.product_name} onChange={(e) => setForm({ ...form, product_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Satuan</Label><Input value={form.default_unit} onChange={(e) => setForm({ ...form, default_unit: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Min Stok</Label><Input type="number" value={form.minimum_stock} onChange={(e) => setForm({ ...form, minimum_stock: n(e.target.value) })} /></div>
+          {editing && <div className="space-y-1.5 col-span-2"><Label>Stok Sistem</Label><Input type="number" value={form.current_stock} onChange={(e) => setForm({ ...form, current_stock: n(e.target.value) })} /></div>}
           <div className="space-y-1.5"><Label>Harga Beli</Label><Input type="number" value={form.current_buy_price} onChange={(e) => setForm({ ...form, current_buy_price: n(e.target.value) })} /></div>
           <div className="space-y-1.5"><Label>Harga Retail</Label><Input type="number" value={form.current_retail_price} onChange={(e) => setForm({ ...form, current_retail_price: n(e.target.value) })} /></div>
           <div className="space-y-1.5"><Label>Harga Grosir</Label><Input type="number" value={form.current_wholesale_price} onChange={(e) => setForm({ ...form, current_wholesale_price: n(e.target.value) })} /></div>
