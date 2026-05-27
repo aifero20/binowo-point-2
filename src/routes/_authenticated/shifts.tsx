@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: ShiftsPage });
 
-type Shift = { id: string; open_time: string; close_time: string | null; opening_cash: number; closing_cash: number; expected_cash: number; cash_difference: number; shift_status: string };
+type Shift = { id: string; open_time: string; close_time: string | null; opening_cash: number; closing_cash: number; expected_cash: number; cash_difference: number; shift_status: string; cashier_id: string | null; total_tunai: number; total_qris: number; total_transfer: number; total_pembelian_tunai: number; users?: { full_name: string } | null };
 
 const PAGE_SIZE = 10;
 
@@ -37,7 +37,7 @@ function ShiftsPage() {
   const { data: allShifts = [] } = useQuery({
     queryKey: ["shifts", filterFrom, filterTo],
     queryFn: async () => {
-      let q = supabase.from("cashier_shifts").select("*").order("open_time", { ascending: false });
+      let q = supabase.from("cashier_shifts").select("*, users(full_name)").order("open_time", { ascending: false });
       if (filterFrom) q = q.gte("open_time", filterFrom + "T00:00:00");
       if (filterTo) q = q.lte("open_time", filterTo + "T23:59:59");
       const { data, error } = await q;
@@ -50,13 +50,39 @@ function ShiftsPage() {
   const shifts = allShifts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const activeShift = allShifts.find((s) => s.shift_status === "OPEN");
 
-  const { data: todaySales = 0 } = useQuery({
-    queryKey: ["today-sales"],
+  // Hitung transaksi selama shift aktif
+  const { data: shiftStats } = useQuery({
+    queryKey: ["shift-stats", activeShift?.id],
+    enabled: !!activeShift,
     queryFn: async () => {
-      const { data } = await supabase.from("sales_headers").select("grand_total").gte("transaction_date", today).is("deleted_at", null);
-      return (data ?? []).reduce((s: number, r: { grand_total: number }) => s + Number(r.grand_total), 0);
+      const from = activeShift!.open_time;
+      // Penjualan per metode
+      const { data: sales } = await supabase.from("sales_headers")
+        .select("grand_total, payment_method")
+        .eq("transaction_status", "SELESAI")
+        .gte("transaction_date", from)
+        .is("deleted_at", null);
+      const tunai = (sales ?? []).filter((s: any) => s.payment_method === "TUNAI").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
+      const qris = (sales ?? []).filter((s: any) => s.payment_method === "QRIS").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
+      const transfer = (sales ?? []).filter((s: any) => s.payment_method === "TRANSFER").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
+      // Retur penjualan tunai (jika ada payment_method)
+      const { data: salesReturns } = await supabase.from("sales_returns")
+        .select("grand_total, payment_method")
+        .gte("return_date", from)
+        .is("deleted_at", null);
+      const returTunai = (salesReturns ?? []).filter((r: any) => r.payment_method === "TUNAI").reduce((a: number, r: any) => a + Number(r.grand_total), 0);
+      // Pembelian tunai (LUNAS)
+      const { data: purchases } = await supabase.from("purchase_headers")
+        .select("grand_total, payment_status")
+        .eq("payment_status", "LUNAS")
+        .gte("created_at", from)
+        .is("deleted_at", null);
+      const pembelianTunai = (purchases ?? []).reduce((a: number, p: any) => a + Number(p.grand_total), 0);
+      return { tunai, qris, transfer, returTunai, pembelianTunai };
     },
   });
+
+  const expectedKas = (activeShift?.opening_cash ?? 0) + (shiftStats?.tunai ?? 0) - (shiftStats?.returTunai ?? 0) - (shiftStats?.pembelianTunai ?? 0);
 
   const openShift = useMutation({
     mutationFn: async () => {
@@ -71,9 +97,18 @@ function ShiftsPage() {
     mutationFn: async () => {
       if (!activeShift) return;
       const closing = Number(closingCash);
-      const expected = Number(activeShift.opening_cash) + todaySales;
-      const diff = closing - expected;
-      const { error } = await supabase.from("cashier_shifts").update({ close_time: new Date().toISOString(), closing_cash: closing, expected_cash: expected, cash_difference: diff, shift_status: "CLOSED" } as never).eq("id", activeShift.id);
+      const diff = closing - expectedKas;
+      const { error } = await supabase.from("cashier_shifts").update({
+        close_time: new Date().toISOString(),
+        closing_cash: closing,
+        expected_cash: expectedKas,
+        cash_difference: diff,
+        shift_status: "CLOSED",
+        total_tunai: shiftStats?.tunai ?? 0,
+        total_qris: shiftStats?.qris ?? 0,
+        total_transfer: shiftStats?.transfer ?? 0,
+        total_pembelian_tunai: shiftStats?.pembelianTunai ?? 0,
+      } as never).eq("id", activeShift.id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Shift ditutup"); qc.invalidateQueries({ queryKey: ["shifts"] }); setCloseShiftOpen(false); },
@@ -81,7 +116,6 @@ function ShiftsPage() {
   });
 
   function resetFilter() { setFilterFrom(""); setFilterTo(""); setPage(1); }
-
   const isFiltered = filterFrom || filterTo;
 
   return (
@@ -90,8 +124,8 @@ function ShiftsPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Status Shift</CardTitle></CardHeader>
           <CardContent><Badge variant={activeShift ? "default" : "secondary"} className="text-base px-3 py-1">{activeShift ? "SHIFT AKTIF" : "TIDAK ADA SHIFT"}</Badge></CardContent>
         </Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Penjualan Hari Ini</CardTitle></CardHeader>
-          <CardContent><p className="text-2xl font-bold text-green-600">{formatRp(todaySales)}</p></CardContent>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Penjualan Tunai Shift Ini</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold text-green-600">{formatRp(shiftStats?.tunai ?? 0)}</p></CardContent>
         </Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Kas Awal</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{activeShift ? formatRp(activeShift.opening_cash) : "-"}</p></CardContent>
@@ -122,17 +156,35 @@ function ShiftsPage() {
 
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>Buka</TableHead><TableHead>Tutup</TableHead><TableHead className="text-right">Kas Awal</TableHead><TableHead className="text-right">Kas Akhir</TableHead><TableHead className="text-right">Expected</TableHead><TableHead className="text-right">Selisih</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow>
+            <TableHead>Kasir</TableHead>
+            <TableHead>Buka</TableHead>
+            <TableHead>Tutup</TableHead>
+            <TableHead className="text-right">Kas Awal</TableHead>
+            <TableHead className="text-right">Tunai</TableHead>
+            <TableHead className="text-right">QRIS</TableHead>
+            <TableHead className="text-right">Transfer</TableHead>
+            <TableHead className="text-right">Pembelian</TableHead>
+            <TableHead className="text-right">Expected</TableHead>
+            <TableHead className="text-right">Kas Aktual</TableHead>
+            <TableHead className="text-right">Selisih</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow></TableHeader>
           <TableBody>
-            {shifts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Belum ada shift.</TableCell></TableRow>}
+            {shifts.length === 0 && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">Belum ada shift.</TableCell></TableRow>}
             {shifts.map((s) => (
               <TableRow key={s.id}>
+                <TableCell className="font-medium text-sm">{(s.users as any)?.full_name ?? "-"}</TableCell>
                 <TableCell className="text-xs">{new Date(s.open_time).toLocaleString("id-ID")}</TableCell>
                 <TableCell className="text-xs">{s.close_time ? new Date(s.close_time).toLocaleString("id-ID") : "-"}</TableCell>
                 <TableCell className="text-right">{formatRp(s.opening_cash)}</TableCell>
-                <TableCell className="text-right">{s.closing_cash ? formatRp(s.closing_cash) : "-"}</TableCell>
+                <TableCell className="text-right text-green-600">{s.total_tunai ? formatRp(s.total_tunai) : "-"}</TableCell>
+                <TableCell className="text-right text-blue-600">{s.total_qris ? formatRp(s.total_qris) : "-"}</TableCell>
+                <TableCell className="text-right text-purple-600">{s.total_transfer ? formatRp(s.total_transfer) : "-"}</TableCell>
+                <TableCell className="text-right text-red-500">{s.total_pembelian_tunai ? formatRp(s.total_pembelian_tunai) : "-"}</TableCell>
                 <TableCell className="text-right">{s.expected_cash ? formatRp(s.expected_cash) : "-"}</TableCell>
-                <TableCell className={["text-right font-bold", s.cash_difference < 0 ? "text-red-500" : "text-green-600"].join(" ")}>{s.cash_difference ? formatRp(s.cash_difference) : "-"}</TableCell>
+                <TableCell className="text-right">{s.closing_cash ? formatRp(s.closing_cash) : "-"}</TableCell>
+                <TableCell className={["text-right font-bold", s.cash_difference < 0 ? "text-red-500" : s.cash_difference > 0 ? "text-green-600" : ""].join(" ")}>{s.cash_difference !== null && s.cash_difference !== undefined ? formatRp(s.cash_difference) : "-"}</TableCell>
                 <TableCell><Badge variant={s.shift_status === "OPEN" ? "default" : "secondary"}>{s.shift_status}</Badge></TableCell>
               </TableRow>
             ))}
@@ -158,14 +210,25 @@ function ShiftsPage() {
       </Dialog>
 
       <Dialog open={closeShiftOpen} onOpenChange={setCloseShiftOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Tutup Shift</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm"><span>Penjualan Hari Ini</span><span className="font-bold text-green-600">{formatRp(todaySales)}</span></div>
-            <div className="flex justify-between text-sm"><span>Kas Awal</span><span>{formatRp(activeShift?.opening_cash ?? 0)}</span></div>
-            <div className="flex justify-between text-sm font-bold border-t pt-2"><span>Expected Total</span><span>{formatRp((activeShift?.opening_cash ?? 0) + todaySales)}</span></div>
-            <Label>Kas Akhir (Rp)</Label>
-            <Input type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} autoFocus />
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span>Kas Awal</span><span>{formatRp(activeShift?.opening_cash ?? 0)}</span></div>
+            <div className="flex justify-between text-green-600"><span>+ Penjualan Tunai</span><span>{formatRp(shiftStats?.tunai ?? 0)}</span></div>
+            <div className="flex justify-between text-blue-600"><span>Penjualan QRIS</span><span>{formatRp(shiftStats?.qris ?? 0)}</span></div>
+            <div className="flex justify-between text-purple-600"><span>Penjualan Transfer</span><span>{formatRp(shiftStats?.transfer ?? 0)}</span></div>
+            <div className="flex justify-between text-red-500"><span>- Retur Tunai</span><span>{formatRp(shiftStats?.returTunai ?? 0)}</span></div>
+            <div className="flex justify-between text-red-500"><span>- Pembelian Tunai</span><span>{formatRp(shiftStats?.pembelianTunai ?? 0)}</span></div>
+            <div className="flex justify-between font-bold border-t pt-2"><span>Expected Kas</span><span>{formatRp(expectedKas)}</span></div>
+            <div className="pt-2 space-y-1.5">
+              <Label>Kas Aktual (Rp) — hitung fisik</Label>
+              <Input type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} autoFocus />
+            </div>
+            {closingCash && (
+              <div className={["flex justify-between font-bold", Number(closingCash) - expectedKas < 0 ? "text-red-500" : "text-green-600"].join(" ")}>
+                <span>Selisih</span><span>{formatRp(Number(closingCash) - expectedKas)}</span>
+              </div>
+            )}
           </div>
           <DialogFooter><Button variant="destructive" onClick={() => closeShift.mutate()} disabled={closeShift.isPending}>{closeShift.isPending ? "Menutup..." : "Tutup Shift"}</Button></DialogFooter>
         </DialogContent>
