@@ -497,8 +497,8 @@ function MasterInventoryPage() {
                   <TableHead>Tanggal</TableHead>
                   <TableHead>Gudang</TableHead>
                   <TableHead>Barang</TableHead>
-                  <TableHead className="text-right">Sebelum</TableHead>
-                  <TableHead className="text-right">Sesudah</TableHead>
+                  <TableHead className="text-right">Sistem Sebelum</TableHead><TableHead className="text-right">Sistem Sesudah</TableHead>
+                  <TableHead className="text-right">Fisik Sebelum</TableHead><TableHead className="text-right">Fisik Sesudah</TableHead>
                   <TableHead className="text-right">Selisih</TableHead>
                 </TableRow>
               </TableHeader>
