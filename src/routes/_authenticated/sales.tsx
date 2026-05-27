@@ -15,6 +15,7 @@ import { Trash2, ShoppingCart, PauseCircle, PlayCircle, XCircle, Printer, Slider
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { logActivity } from "@/lib/log-activity";
 import { useRequireShift } from "@/hooks/use-require-shift";
 import { isOnline, saveOfflineSale, syncPendingSales } from "@/lib/offline-sync";
 import { db } from "@/lib/db";
@@ -207,6 +208,7 @@ function SalesPOS() {
     },
     onSuccess: (data) => {
       toast.success(`Transaksi ${data.no} berhasil`);
+      void logActivity(user?.id, "CREATE", `Penjualan ${data.no} berhasil`, "sales_headers");
       setPrintData(data);
       setCart([]);
       setPaymentAmount(0);
@@ -253,7 +255,7 @@ function SalesPOS() {
       const { error } = await supabase.from("sales_headers").update({ deleted_at: new Date().toISOString(), transaction_status: "VOID" } as never).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Transaksi di-void"); setVoidDialog(null); qc.invalidateQueries(); },
+    onSuccess: () => { toast.success("Transaksi di-void"); void logActivity(user?.id, "VOID", "Transaksi di-void", "sales_headers"); setVoidDialog(null); qc.invalidateQueries(); },
     onError: (e: Error) => toast.error(e.message),
   });
 

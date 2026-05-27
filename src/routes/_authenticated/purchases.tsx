@@ -13,6 +13,7 @@ import { Plus, Trash2, ShoppingBag, SlidersHorizontal, ChevronLeft, ChevronRight
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
+import { logActivity } from "@/lib/log-activity";
 import { useRequireShift } from "@/hooks/use-require-shift";
 
 export const Route = createFileRoute("/_authenticated/purchases")({ component: PurchasesPage });
@@ -197,7 +198,7 @@ function PurchasesPage() {
         await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
       }
     },
-    onSuccess: () => { toast.success("Pembelian disimpan"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setWarehouseId(""); setInvoiceNumber(""); setDueDate(""); },
+    onSuccess: () => { toast.success("Pembelian disimpan"); void logActivity(user?.id, "CREATE", "Pembelian baru disimpan", "purchase_headers"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setWarehouseId(""); setInvoiceNumber(""); setDueDate(""); },
     onError: (e: Error) => toast.error(e.message),
   });
 
