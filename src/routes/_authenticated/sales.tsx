@@ -114,7 +114,7 @@ function SalesPOS() {
   const HISTORY_PAGE_SIZE = 10;
 
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
-    queryKey: ["recent-sales", historySearch, historyFrom, historyTo],
+    queryKey: ["recent-sales", historyFrom, historyTo],
     queryFn: async () => {
       let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at").is("deleted_at", null).order("created_at", { ascending: false }).limit(500);
       if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
@@ -122,7 +122,6 @@ function SalesPOS() {
       const { data, error } = await q;
       if (error) throw error;
       const all = data ?? [];
-      if (historySearch) return all.filter((s) => s.sales_number.toLowerCase().includes(historySearch.toLowerCase()));
       return all;
     },
     staleTime: 0,
@@ -130,7 +129,7 @@ function SalesPOS() {
 
   const historyTotalPages = Math.max(1, Math.ceil(recentSales.length / HISTORY_PAGE_SIZE));
   const pagedSales = recentSales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
-  const isHistoryFiltered = historySearch || historyFrom || historyTo;
+  const isHistoryFiltered = historyFrom || historyTo;
 
   const selectedCustomerType = useMemo(() => {
     if (customerId === "none") return "RETAIL";
