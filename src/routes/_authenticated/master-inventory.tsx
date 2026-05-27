@@ -498,7 +498,7 @@ function MasterInventoryPage() {
                   <TableHead>Gudang</TableHead>
                   <TableHead>Barang</TableHead>
                   <TableHead className="text-right">Sistem Sebelum</TableHead><TableHead className="text-right">Sistem Sesudah</TableHead>
-                  <TableHead className="text-right">Fisik Sebelum</TableHead><TableHead className="text-right">Fisik Sesudah</TableHead>
+                  <TableHead className="text-right">Aktual Sebelum</TableHead><TableHead className="text-right">Aktual Sesudah</TableHead>
                   <TableHead className="text-right">Selisih</TableHead>
                 </TableRow>
               </TableHeader>
@@ -526,18 +526,18 @@ function MasterInventoryPage() {
                         <p className="text-xs text-muted-foreground">{d.products?.product_code}</p>
                       </TableCell>
                       {(() => {
-                        const sistemSebelum = d.qty_system_before ?? d.qty_system;
+                        const sistemSebelum = d.qty_system_before || d.qty_system;
                         const sistemSesudah = d.qty_system;
-                        const fisikSebelum = d.qty_system_before ?? d.qty_system;
-                        const fisikSesudah = d.qty_actual;
+                        const aktualSebelum = d.qty_system_before || d.qty_system;
+                        const aktualSesudah = d.qty_actual;
                         const selisih = d.qty_actual - d.qty_system;
                         return (
                           <>
                             <TableCell className="text-right text-xs text-muted-foreground">{sistemSebelum}</TableCell>
                             <TableCell className="text-right text-sm font-medium">{sistemSesudah}</TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">{fisikSebelum}</TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">{aktualSebelum}</TableCell>
                             <TableCell className="text-right text-sm font-medium">
-                              {fisikSesudah}
+                              {aktualSesudah}
                               {selisih !== 0 && (
                                 <span className="text-xs ml-1 text-foreground">
                                   {selisih > 0 ? "▲" : "▼"}{Math.abs(selisih)}
