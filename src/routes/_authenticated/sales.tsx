@@ -127,8 +127,8 @@ function SalesPOS() {
     staleTime: 0,
   });
 
-  const historyTotalPages = Math.max(1, Math.ceil(recentSales.length / HISTORY_PAGE_SIZE));
-  const pagedSales = recentSales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
+  const historyTotalPages = Math.max(1, Math.ceil(filteredSales.length / HISTORY_PAGE_SIZE));
+  const pagedSales = filteredSales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
   const isHistoryFiltered = historyFrom || historyTo;
 
   const selectedCustomerType = useMemo(() => {
