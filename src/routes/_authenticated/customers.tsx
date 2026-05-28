@@ -169,7 +169,7 @@ function CustomerForm({ editing, onSubmit, loading }: { editing: Customer | null
       <DialogHeader><DialogTitle>{editing ? "Edit Customer" : "Tambah Customer"}</DialogTitle></DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Kode *</Label><Input required value={form.customer_code ?? ""} onChange={(e) => setForm({ ...form, customer_code: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Kode</Label><Input readOnly value={form.customer_code ?? ""} className="bg-muted text-muted-foreground cursor-not-allowed" /></div>
           <div className="space-y-1.5"><Label>Nama *</Label><Input required value={form.customer_name ?? ""} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Kota</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Telepon</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>

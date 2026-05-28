@@ -156,7 +156,7 @@ function SupplierForm({ editing, onSubmit, loading }: { editing: Supplier | null
       <DialogHeader><DialogTitle>{editing ? "Edit Supplier" : "Tambah Supplier"}</DialogTitle></DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><Label>Kode *</Label><Input required value={form.supplier_code ?? ""} onChange={(e) => setForm({ ...form, supplier_code: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Kode</Label><Input readOnly value={form.supplier_code ?? ""} className="bg-muted text-muted-foreground cursor-not-allowed" /></div>
           <div className="space-y-1.5"><Label>Nama *</Label><Input required value={form.supplier_name ?? ""} onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Kota</Label><Input value={form.city ?? ""} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Telepon</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
