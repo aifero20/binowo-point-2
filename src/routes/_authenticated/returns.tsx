@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, SlidersHorizontal, ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
@@ -23,6 +23,24 @@ type ReturnDetail = { qty: number; unit_name: string; buy_price: number; product
 type ReturnHeader = { id: string; return_number: string; return_date: string; grand_total: number; suppliers: { supplier_name: string } | null; purchase_return_details: ReturnDetail[] };
 
 const PAGE_SIZE = 10;
+
+type ReceiptData = {
+  no: string;
+  type: "PEMBELIAN" | "PENJUALAN";
+  partyName: string;
+  date: string;
+  items: { product_name: string; qty: number; unit_name: string; price: number }[];
+  grandTotal: number;
+};
+
+type ReceiptData = {
+  no: string;
+  type: "PEMBELIAN" | "PENJUALAN";
+  partyName: string;
+  date: string;
+  items: { product_name: string; qty: number; unit_name: string; price: number }[];
+  grandTotal: number;
+};
 
 function ReturnsPage() {
   const { user } = useAuth();
@@ -55,6 +73,8 @@ function ReturnsPage() {
   const [srNotes, setSrNotes] = useState("");
   const [srLines, setSrLines] = useState<ReturnLine[]>([]);
   const [srSearch, setSrSearch] = useState("");
+  const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
+  const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
 
   // Retur Penjualan filter + pagination
   const [showFilterS, setShowFilterS] = useState(false);
@@ -174,7 +194,20 @@ function ReturnsPage() {
       await supabase.from("purchase_return_details").insert(lines.map((l) => ({ return_id: rid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, buy_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(lines.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "return_out", reference_number: return_number, qty_out: l.qty, created_by: user!.id })) as never);
     },
-    onSuccess: () => { toast.success("Retur berhasil disimpan"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setNotes(""); },
+    onSuccess: (_, __, ctx: any) => {
+      toast.success("Retur berhasil disimpan");
+      qc.invalidateQueries();
+      const sup = (suppliers as any[]).find((s) => s.id === supplierId);
+      setPrintReceipt({
+        no: ctx?.return_number ?? "RTR",
+        type: "PEMBELIAN",
+        partyName: sup?.supplier_name ?? "-",
+        date: new Date().toLocaleString("id-ID"),
+        items: lines.map((l) => ({ product_name: l.product_name, qty: l.qty, unit_name: l.unit_name, price: l.buy_price })),
+        grandTotal,
+      });
+      setOpen(false); setLines([]); setSupplierId(""); setNotes("");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -190,7 +223,21 @@ function ReturnsPage() {
       await supabase.from("sales_details").insert(srLines.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: srWarehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(srLines.map((l) => ({ product_id: l.product_id, warehouse_id: srWarehouseId, transaction_type: "sales_return", reference_number: return_number, qty_in: l.qty, created_by: user!.id })) as never);
     },
-    onSuccess: () => { toast.success("Retur penjualan disimpan"); qc.invalidateQueries(); setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrNotes(""); },
+    onSuccess: (_, __, ctx: any) => {
+      toast.success("Retur penjualan disimpan");
+      qc.invalidateQueries();
+      const cust = (customers as any[]).find((c) => c.id === srCustomerId);
+      const srGrand = srLines.reduce((s, l) => s + l.qty * l.buy_price, 0);
+      setPrintReceipt({
+        no: ctx?.return_number ?? "RSL",
+        type: "PENJUALAN",
+        partyName: cust?.customer_name ?? "Umum / Walk-in",
+        date: new Date().toLocaleString("id-ID"),
+        items: srLines.map((l) => ({ product_name: l.product_name, qty: l.qty, unit_name: l.unit_name, price: l.buy_price })),
+        grandTotal: srGrand,
+      });
+      setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrNotes("");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -273,7 +320,7 @@ function ReturnsPage() {
 
           <Card><CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
                 {pagedReturns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur pembelian.</TableCell></TableRow>}
                 {pagedReturns.map((r) => (
@@ -288,6 +335,16 @@ function ReturnsPage() {
                       {(r.purchase_return_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.purchase_return_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
                     <TableCell className="text-right font-medium text-red-500">{formatRp(r.grand_total)}</TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => setPrintReceipt({
+                        no: r.return_number,
+                        type: "PEMBELIAN",
+                        partyName: r.suppliers?.supplier_name ?? "-",
+                        date: new Date(r.return_date).toLocaleString("id-ID"),
+                        items: (r.purchase_return_details ?? []).map((d) => ({ product_name: d.products?.product_name ?? "-", qty: d.qty, unit_name: d.unit_name, price: d.buy_price })),
+                        grandTotal: r.grand_total,
+                      })}><Printer className="h-4 w-4" /></Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -381,7 +438,7 @@ function ReturnsPage() {
 
           <Card><CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Tanggal</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Tanggal</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
                 {pagedSalesReturns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur penjualan.</TableCell></TableRow>}
                 {pagedSalesReturns.map((r: any) => (
@@ -396,6 +453,16 @@ function ReturnsPage() {
                       {(r.sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.sales_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
                     <TableCell className="text-right font-medium text-red-500">{formatRp(r.grand_total)}</TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => setPrintReceipt({
+                        no: r.sales_number,
+                        type: "PENJUALAN",
+                        partyName: r.customers?.customer_name ?? "Umum / Walk-in",
+                        date: new Date(r.transaction_date).toLocaleString("id-ID"),
+                        items: (r.sales_details ?? []).map((d: any) => ({ product_name: d.products?.product_name ?? "-", qty: d.qty, unit_name: d.unit_name, price: d.selling_price })),
+                        grandTotal: r.grand_total,
+                      })}><Printer className="h-4 w-4" /></Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -412,6 +479,78 @@ function ReturnsPage() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+      {printReceipt && (
+        <Dialog open={!!printReceipt} onOpenChange={() => setPrintReceipt(null)}>
+          <DialogContent className="max-w-xs">
+            <DialogHeader><DialogTitle className="text-center">Struk Retur {printReceipt.type === "PEMBELIAN" ? "Pembelian" : "Penjualan"}</DialogTitle></DialogHeader>
+            <div className="font-mono text-xs space-y-1 border rounded p-3">
+              <p className="text-center font-bold text-sm">GROSIR ROKOK BINOWO</p>
+              <p className="text-center">Binowo, Balarejo, Kebonsari</p>
+              <p className="text-center">Telp / WA : 0813 3113 1048</p>
+              <div className="border-t border-dashed my-2" />
+              <p className="text-center font-bold">--- RETUR {printReceipt.type} ---</p>
+              <p className="text-center text-muted-foreground">{printReceipt.date}</p>
+              <div className="flex justify-between">
+                <span>{printReceipt.no}</span>
+                <span>{printReceipt.partyName}</span>
+              </div>
+              <div className="border-t border-dashed my-2" />
+              {printReceipt.items.map((item, i) => (
+                <div key={i}>
+                  <p>{item.product_name}</p>
+                  <div className="flex justify-between">
+                    <span>{item.qty} {item.unit_name} x {formatRp(item.price)}</span>
+                    <span>{formatRp(item.qty * item.price)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="border-t border-dashed my-2" />
+              <div className="flex justify-between font-bold"><span>TOTAL RETUR</span><span>{formatRp(printReceipt.grandTotal)}</span></div>
+              <div className="border-t border-dashed my-2" />
+              <p className="text-center">Terima kasih!</p>
+            </div>
+            <DialogFooter>
+              <Button className="w-full gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      {printReceipt && (
+        <Dialog open={!!printReceipt} onOpenChange={() => setPrintReceipt(null)}>
+          <DialogContent className="max-w-xs">
+            <DialogHeader><DialogTitle className="text-center">Struk Retur {printReceipt.type === "PEMBELIAN" ? "Pembelian" : "Penjualan"}</DialogTitle></DialogHeader>
+            <div className="font-mono text-xs space-y-1 border rounded p-3">
+              <p className="text-center font-bold text-sm">GROSIR ROKOK BINOWO</p>
+              <p className="text-center">Binowo, Balarejo, Kebonsari</p>
+              <p className="text-center">Telp / WA : 0813 3113 1048</p>
+              <div className="border-t border-dashed my-2" />
+              <p className="text-center font-bold">--- RETUR {printReceipt.type} ---</p>
+              <p className="text-center text-muted-foreground">{printReceipt.date}</p>
+              <div className="flex justify-between">
+                <span>{printReceipt.no}</span>
+                <span>{printReceipt.partyName}</span>
+              </div>
+              <div className="border-t border-dashed my-2" />
+              {printReceipt.items.map((item, i) => (
+                <div key={i}>
+                  <p>{item.product_name}</p>
+                  <div className="flex justify-between">
+                    <span>{item.qty} {item.unit_name} x {formatRp(item.price)}</span>
+                    <span>{formatRp(item.qty * item.price)}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="border-t border-dashed my-2" />
+              <div className="flex justify-between font-bold"><span>TOTAL RETUR</span><span>{formatRp(printReceipt.grandTotal)}</span></div>
+              <div className="border-t border-dashed my-2" />
+              <p className="text-center">Terima kasih!</p>
+            </div>
+            <DialogFooter>
+              <Button className="w-full gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
