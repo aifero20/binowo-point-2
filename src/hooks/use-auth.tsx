@@ -25,10 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === "SIGNED_IN" && s?.user) {
-        void supabase.from("activity_logs").insert({ user_id: s.user.id, activity_type: "LOGIN", description: `Login: ${s.user.email}` } as never);
       }
       if (event === "SIGNED_OUT") {
-        void supabase.from("activity_logs").insert({ activity_type: "LOGOUT", description: "User logout" } as never);
       }
       setSession(s);
       setUser(s?.user ?? null);

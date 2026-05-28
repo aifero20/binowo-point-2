@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
-import { logActivity } from "@/lib/log-activity";
 import { useRequireShift } from "@/hooks/use-require-shift";
 
 export const Route = createFileRoute("/_authenticated/returns")({ component: ReturnsPage });
@@ -175,7 +174,7 @@ function ReturnsPage() {
       await supabase.from("purchase_return_details").insert(lines.map((l) => ({ return_id: rid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, buy_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(lines.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "return_out", reference_number: return_number, qty_out: l.qty, created_by: user!.id })) as never);
     },
-    onSuccess: () => { toast.success("Retur berhasil disimpan"); void logActivity(user?.id, "CREATE", "Retur pembelian disimpan", "purchase_returns"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setNotes(""); },
+    onSuccess: () => { toast.success("Retur berhasil disimpan"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setNotes(""); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -191,7 +190,7 @@ function ReturnsPage() {
       await supabase.from("sales_details").insert(srLines.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: srWarehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(srLines.map((l) => ({ product_id: l.product_id, warehouse_id: srWarehouseId, transaction_type: "sales_return", reference_number: return_number, qty_in: l.qty, created_by: user!.id })) as never);
     },
-    onSuccess: () => { toast.success("Retur penjualan disimpan"); void logActivity(user?.id, "CREATE", "Retur penjualan disimpan", "sales_headers"); qc.invalidateQueries(); setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrNotes(""); },
+    onSuccess: () => { toast.success("Retur penjualan disimpan"); qc.invalidateQueries(); setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrNotes(""); },
     onError: (e: Error) => toast.error(e.message),
   });
 

@@ -13,7 +13,6 @@ import { Clock, DollarSign, SlidersHorizontal, ChevronLeft, ChevronRight } from 
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
-import { logActivity } from "@/lib/log-activity";
 
 export const Route = createFileRoute("/_authenticated/shifts")({ component: ShiftsPage });
 
@@ -100,7 +99,7 @@ function ShiftsPage() {
       const { error } = await supabase.from("cashier_shifts").insert({ cashier_id: user!.id, opening_cash: Number(openingCash), shift_status: "OPEN" } as never);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Shift dibuka"); void logActivity(user?.id, "CREATE", "Shift kasir dibuka"); qc.invalidateQueries({ queryKey: ["shifts"] }); setOpenShiftOpen(false); },
+    onSuccess: () => { toast.success("Shift dibuka"); qc.invalidateQueries({ queryKey: ["shifts"] }); setOpenShiftOpen(false); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -123,7 +122,7 @@ function ShiftsPage() {
       } as never).eq("id", activeShift.id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Shift ditutup"); void logActivity(user?.id, "UPDATE", "Shift kasir ditutup"); qc.invalidateQueries({ queryKey: ["shifts"] }); setCloseShiftOpen(false); },
+    onSuccess: () => { toast.success("Shift ditutup"); qc.invalidateQueries({ queryKey: ["shifts"] }); setCloseShiftOpen(false); },
     onError: (e: Error) => toast.error(e.message),
   });
 

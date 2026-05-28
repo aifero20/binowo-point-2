@@ -15,7 +15,6 @@ import { Plus, Pencil, Trash2, Package2, Tag, AlertTriangle, SlidersHorizontal, 
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
-import { logActivity } from "@/lib/log-activity";
 
 export const Route = createFileRoute("/_authenticated/master-inventory")({ component: MasterInventoryPage });
 
@@ -208,7 +207,7 @@ function MasterInventoryPage() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { toast.success("Barang disimpan"); void logActivity(user?.id, editing ? "UPDATE" : "CREATE", editing ? `Barang diupdate: ${editing.product_name}` : "Barang baru ditambahkan", "products"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); qc.invalidateQueries({ queryKey: ["inventory-movements"] }); setOpenProduct(false); setEditing(null); },
+    onSuccess: () => { toast.success("Barang disimpan"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); qc.invalidateQueries({ queryKey: ["inventory-movements"] }); setOpenProduct(false); setEditing(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -217,7 +216,7 @@ function MasterInventoryPage() {
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() } as never).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Barang dihapus"); void logActivity(user?.id, "DELETE", "Barang dihapus", "products"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); },
+    onSuccess: () => { toast.success("Barang dihapus"); qc.invalidateQueries({ queryKey: ["inventory-products"] }); },
   });
 
   const saveAdjustment = useMutation({

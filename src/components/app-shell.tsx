@@ -27,7 +27,6 @@ const NAV = [
   { to: "/warehouses",      label: "Gudang",            icon: WarehouseIcon,   menu_code: "GUDANG" },
   { to: "/reports",         label: "Laporan",           icon: BarChart2,       menu_code: "LAPORAN" },
   { to: "/users",           label: "Manajemen User",    icon: UserCog,         menu_code: "MANAJEMEN_USER" },
-  { to: "/activity-logs",   label: "Activity Log",      icon: ScrollText,      menu_code: "ACTIVITY_LOG" },
   { to: "/permissions",     label: "Permission Matrix", icon: ShieldCheck,     menu_code: "PERMISSION_MATRIX" },
 ] as const;
 
