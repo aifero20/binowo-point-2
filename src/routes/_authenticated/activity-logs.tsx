@@ -19,25 +19,27 @@ type Log = { id: string; activity_time: string; activity_type: string; descripti
 const PAGE_SIZE = 10;
 
 const TYPE_COLORS: Record<string, "default" | "secondary" | "destructive"> = {
-  LOGIN: "default", LOGOUT: "secondary",
   CREATE: "default", UPDATE: "secondary",
   DELETE: "destructive", VOID: "destructive",
 };
 
-const ALL_TYPES = ["LOGIN", "LOGOUT", "CREATE", "UPDATE", "DELETE", "VOID"];
+const ALL_TYPES = ["CREATE", "UPDATE", "DELETE", "VOID"];
 
-// Role yang boleh dilihat oleh masing-masing role
+// Hanya log dari tabel ini yang ditampilkan
+const ALLOWED_TABLES = ["sales_headers", "purchase_headers", "purchase_returns", "cashier_shifts"];
+
+// Role yang boleh dilihat (uppercase sesuai DB)
 const VISIBLE_ROLES: Record<string, string[]> = {
-  owner:      ["owner", "admin", "supervisor", "kasir"],
-  admin:      ["admin", "supervisor", "kasir"],
-  supervisor: ["supervisor", "kasir"],
-  kasir:      ["kasir"],
+  OWNER:      ["OWNER", "ADMIN", "SUPERVISOR", "KASIR"],
+  ADMIN:      ["ADMIN", "SUPERVISOR", "KASIR"],
+  SUPERVISOR: ["SUPERVISOR", "KASIR"],
+  KASIR:      ["KASIR"],
 };
 
 function ActivityLogsPage() {
   const { user, roles } = useAuth();
-  const role = (roles[0] ?? "").toLowerCase();
-  const visibleRoles = VISIBLE_ROLES[role] ?? ["kasir"];
+  const role = (roles[0] ?? "").toUpperCase();
+  const visibleRoles = VISIBLE_ROLES[role] ?? ["KASIR"];
 
   const [showFilter, setShowFilter] = useState(false);
   const [filterType, setFilterType] = useState("ALL");
@@ -46,7 +48,6 @@ function ActivityLogsPage() {
   const [filterTo, setFilterTo] = useState("");
   const [page, setPage] = useState(1);
 
-  // Ambil daftar user yang boleh dilihat lognya
   const { data: allowedUsers = [] } = useQuery({
     queryKey: ["users-allowed-log", role],
     queryFn: async () => {
@@ -66,9 +67,10 @@ function ActivityLogsPage() {
     enabled: allowedUserIds.length > 0,
     queryFn: async () => {
       let q = supabase.from("activity_logs")
-        .select("id, activity_time, activity_type, description, user_id")
+        .select("id, activity_time, activity_type, description, user_id, table_name")
         .order("activity_time", { ascending: false })
         .in("user_id", allowedUserIds)
+        .in("table_name", ALLOWED_TABLES)
         .limit(500);
 
       if (filterType !== "ALL") q = q.eq("activity_type", filterType);
@@ -80,7 +82,6 @@ function ActivityLogsPage() {
       if (error) throw error;
       const logs = data as Log[];
 
-      // Map user_id ke nama
       const userMap: Record<string, string> = {};
       (allowedUsers as any[]).forEach((u) => { userMap[u.id] = u.full_name; });
       return logs.map((l) => ({ ...l, kasir_name: l.user_id ? (userMap[l.user_id] ?? "-") : "-" }));
