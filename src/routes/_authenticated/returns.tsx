@@ -21,26 +21,16 @@ export const Route = createFileRoute("/_authenticated/returns")({ component: Ret
 type ReturnLine = { product_id: string; product_name: string; unit_name: string; qty: number; buy_price: number };
 type ReturnDetail = { qty: number; unit_name: string; buy_price: number; products: { product_name: string } | null };
 type ReturnHeader = { id: string; return_number: string; return_date: string; grand_total: number; suppliers: { supplier_name: string } | null; purchase_return_details: ReturnDetail[] };
+type ReceiptData = {
+  no: string;
+  type: "PEMBELIAN" | "PENJUALAN";
+  partyName: string;
+  date: string;
+  items: { product_name: string; qty: number; unit_name: string; price: number }[];
+  grandTotal: number;
+};
 
 const PAGE_SIZE = 10;
-
-type ReceiptData = {
-  no: string;
-  type: "PEMBELIAN" | "PENJUALAN";
-  partyName: string;
-  date: string;
-  items: { product_name: string; qty: number; unit_name: string; price: number }[];
-  grandTotal: number;
-};
-
-type ReceiptData = {
-  no: string;
-  type: "PEMBELIAN" | "PENJUALAN";
-  partyName: string;
-  date: string;
-  items: { product_name: string; qty: number; unit_name: string; price: number }[];
-  grandTotal: number;
-};
 
 function ReturnsPage() {
   const { user } = useAuth();
@@ -49,15 +39,12 @@ function ReturnsPage() {
   if (needsShift && shiftLoading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Memeriksa shift...</p></div>;
   if (needsShift && !hasOpenShift) return null;
 
-  // Retur Pembelian form
   const [open, setOpen] = useState(false);
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<ReturnLine[]>([]);
   const [searchProduct, setSearchProduct] = useState("");
-
-  // Retur Pembelian filter + pagination
   const [showFilterP, setShowFilterP] = useState(false);
   const [filterPNoRetur, setFilterPNoRetur] = useState("");
   const [filterPFrom, setFilterPFrom] = useState("");
@@ -66,17 +53,12 @@ function ReturnsPage() {
   const [filterPProduct, setFilterPProduct] = useState("");
   const [pageP, setPageP] = useState(1);
 
-  // Retur Penjualan form
   const [openSalesReturn, setOpenSalesReturn] = useState(false);
   const [srCustomerId, setSrCustomerId] = useState("");
   const [srWarehouseId, setSrWarehouseId] = useState("");
   const [srNotes, setSrNotes] = useState("");
   const [srLines, setSrLines] = useState<ReturnLine[]>([]);
   const [srSearch, setSrSearch] = useState("");
-  const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
-  const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
-
-  // Retur Penjualan filter + pagination
   const [showFilterS, setShowFilterS] = useState(false);
   const [filterSNoTrx, setFilterSNoTrx] = useState("");
   const [filterSFrom, setFilterSFrom] = useState("");
@@ -84,6 +66,8 @@ function ReturnsPage() {
   const [filterSCustomer, setFilterSCustomer] = useState("");
   const [filterSProduct, setFilterSProduct] = useState("");
   const [pageS, setPageS] = useState(1);
+
+  const [printReceipt, setPrintReceipt] = useState<ReceiptData | null>(null);
 
   const { data: returns = [] } = useQuery({
     queryKey: ["purchase-returns"],
@@ -138,13 +122,12 @@ function ReturnsPage() {
 
   useEffect(() => {
     if (warehouses.length > 0) {
-      const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
-      if (!warehouseId) setWarehouseId(utama.id);
-      if (!srWarehouseId) setSrWarehouseId(utama.id);
+      const utama = warehouses.find((w: any) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
+      if (!warehouseId) setWarehouseId((utama as any).id);
+      if (!srWarehouseId) setSrWarehouseId((utama as any).id);
     }
   }, [warehouses]);
 
-  // Filter retur pembelian
   const filteredReturns = returns.filter((r) => {
     if (filterPNoRetur && !r.return_number.toLowerCase().includes(filterPNoRetur.toLowerCase())) return false;
     if (filterPFrom && r.return_date < filterPFrom) return false;
@@ -160,7 +143,6 @@ function ReturnsPage() {
   const pagedReturns = filteredReturns.slice((pageP - 1) * PAGE_SIZE, pageP * PAGE_SIZE);
   const isFilteredP = filterPNoRetur || filterPFrom || filterPTo || filterPSupplier || filterPProduct;
 
-  // Filter retur penjualan
   const filteredSalesReturns = (salesReturns as any[]).filter((r) => {
     if (filterSNoTrx && !r.sales_number.toLowerCase().includes(filterSNoTrx.toLowerCase())) return false;
     if (filterSFrom && r.transaction_date < filterSFrom) return false;
@@ -178,7 +160,7 @@ function ReturnsPage() {
 
   const grandTotal = lines.reduce((s, l) => s + l.qty * l.buy_price, 0);
 
-  function addLine(p: typeof products[0]) {
+  function addLine(p: any) {
     setLines((prev) => prev.find((l) => l.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_buy_price) }]);
   }
 
@@ -193,13 +175,14 @@ function ReturnsPage() {
       const rid = (header as { id: string }).id;
       await supabase.from("purchase_return_details").insert(lines.map((l) => ({ return_id: rid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, buy_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(lines.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "return_out", reference_number: return_number, qty_out: l.qty, created_by: user!.id })) as never);
+      return { return_number };
     },
-    onSuccess: (_, __, ctx: any) => {
+    onSuccess: (result) => {
       toast.success("Retur berhasil disimpan");
       qc.invalidateQueries();
       const sup = (suppliers as any[]).find((s) => s.id === supplierId);
       setPrintReceipt({
-        no: ctx?.return_number ?? "RTR",
+        no: result.return_number,
         type: "PEMBELIAN",
         partyName: sup?.supplier_name ?? "-",
         date: new Date().toLocaleString("id-ID"),
@@ -222,19 +205,19 @@ function ReturnsPage() {
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(srLines.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: srWarehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.buy_price, total: l.qty * l.buy_price })) as never);
       await supabase.from("stock_movements").insert(srLines.map((l) => ({ product_id: l.product_id, warehouse_id: srWarehouseId, transaction_type: "sales_return", reference_number: return_number, qty_in: l.qty, created_by: user!.id })) as never);
+      return { return_number, grand_total };
     },
-    onSuccess: (_, __, ctx: any) => {
+    onSuccess: (result) => {
       toast.success("Retur penjualan disimpan");
       qc.invalidateQueries();
       const cust = (customers as any[]).find((c) => c.id === srCustomerId);
-      const srGrand = srLines.reduce((s, l) => s + l.qty * l.buy_price, 0);
       setPrintReceipt({
-        no: ctx?.return_number ?? "RSL",
+        no: result.return_number,
         type: "PENJUALAN",
         partyName: cust?.customer_name ?? "Umum / Walk-in",
         date: new Date().toLocaleString("id-ID"),
         items: srLines.map((l) => ({ product_name: l.product_name, qty: l.qty, unit_name: l.unit_name, price: l.buy_price })),
-        grandTotal: srGrand,
+        grandTotal: result.grand_total,
       });
       setOpenSalesReturn(false); setSrLines([]); setSrCustomerId(""); setSrNotes("");
     },
@@ -263,13 +246,13 @@ function ReturnsPage() {
                       <div className="space-y-1.5"><Label>Supplier *</Label>
                         <Select value={supplierId} onValueChange={setSupplierId}>
                           <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-                          <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                          <SelectContent>{(suppliers as any[]).map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5"><Label>Gudang *</Label>
                         <Select value={warehouseId} onValueChange={setWarehouseId}>
                           <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
-                          <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
+                          <SelectContent>{(warehouses as any[]).map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5"><Label>Catatan</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Alasan retur..." /></div>
@@ -278,7 +261,7 @@ function ReturnsPage() {
                       <Label>Cari Barang</Label>
                       <Input autoFocus placeholder="Cari nama barang..." value={searchProduct} onChange={(e) => setSearchProduct(e.target.value)} />
                       <div className="border rounded max-h-48 overflow-y-auto divide-y">
-                        {products.map((p) => (
+                        {(products as any[]).map((p) => (
                           <div key={p.id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => addLine(p)}>
                             <span>{p.product_name}</span><span className="text-muted-foreground text-xs">{formatRp(p.current_buy_price)}</span>
                           </div>
@@ -322,7 +305,7 @@ function ReturnsPage() {
             <Table>
               <TableHeader><TableRow><TableHead>No. Retur</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
-                {pagedReturns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur pembelian.</TableCell></TableRow>}
+                {pagedReturns.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada retur pembelian.</TableCell></TableRow>}
                 {pagedReturns.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.return_number}</TableCell>
@@ -330,7 +313,7 @@ function ReturnsPage() {
                     <TableCell>{r.suppliers?.supplier_name ?? "-"}</TableCell>
                     <TableCell className="text-xs max-w-[220px]">
                       {(r.purchase_return_details ?? []).slice(0, 3).map((d, i) => (
-                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">x{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
                       ))}
                       {(r.purchase_return_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.purchase_return_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
@@ -380,14 +363,14 @@ function ReturnsPage() {
                           <SelectTrigger><SelectValue placeholder="Umum / Walk-in" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Umum / Walk-in</SelectItem>
-                            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
+                            {(customers as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.customer_name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5"><Label>Gudang *</Label>
                         <Select value={srWarehouseId} onValueChange={setSrWarehouseId}>
                           <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
-                          <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
+                          <SelectContent>{(warehouses as any[]).map((w) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1.5"><Label>Catatan</Label><Input value={srNotes} onChange={(e) => setSrNotes(e.target.value)} placeholder="Alasan retur..." /></div>
@@ -396,7 +379,7 @@ function ReturnsPage() {
                       <Label>Cari Barang</Label>
                       <Input autoFocus placeholder="Cari nama barang..." value={srSearch} onChange={(e) => setSrSearch(e.target.value)} />
                       <div className="border rounded max-h-48 overflow-y-auto divide-y">
-                        {srProducts.map((p) => (
+                        {(srProducts as any[]).map((p) => (
                           <div key={p.id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setSrLines((prev) => prev.find((l) => l.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_retail_price) }])}>
                             <span>{p.product_name}</span><span className="text-muted-foreground text-xs">{formatRp(p.current_retail_price)}</span>
                           </div>
@@ -440,7 +423,7 @@ function ReturnsPage() {
             <Table>
               <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Tanggal</TableHead><TableHead>Customer</TableHead><TableHead>Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
-                {pagedSalesReturns.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada retur penjualan.</TableCell></TableRow>}
+                {pagedSalesReturns.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada retur penjualan.</TableCell></TableRow>}
                 {pagedSalesReturns.map((r: any) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.sales_number}</TableCell>
@@ -448,7 +431,7 @@ function ReturnsPage() {
                     <TableCell>{r.customers?.customer_name ?? <span className="text-muted-foreground text-xs">Umum</span>}</TableCell>
                     <TableCell className="text-xs max-w-[220px]">
                       {(r.sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
-                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name}</span></div>
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">x{d.qty} {d.unit_name}</span></div>
                       ))}
                       {(r.sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{(r.sales_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
@@ -479,42 +462,7 @@ function ReturnsPage() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
-      {printReceipt && (
-        <Dialog open={!!printReceipt} onOpenChange={() => setPrintReceipt(null)}>
-          <DialogContent className="max-w-xs">
-            <DialogHeader><DialogTitle className="text-center">Struk Retur {printReceipt.type === "PEMBELIAN" ? "Pembelian" : "Penjualan"}</DialogTitle></DialogHeader>
-            <div className="font-mono text-xs space-y-1 border rounded p-3">
-              <p className="text-center font-bold text-sm">GROSIR ROKOK BINOWO</p>
-              <p className="text-center">Binowo, Balarejo, Kebonsari</p>
-              <p className="text-center">Telp / WA : 0813 3113 1048</p>
-              <div className="border-t border-dashed my-2" />
-              <p className="text-center font-bold">--- RETUR {printReceipt.type} ---</p>
-              <p className="text-center text-muted-foreground">{printReceipt.date}</p>
-              <div className="flex justify-between">
-                <span>{printReceipt.no}</span>
-                <span>{printReceipt.partyName}</span>
-              </div>
-              <div className="border-t border-dashed my-2" />
-              {printReceipt.items.map((item, i) => (
-                <div key={i}>
-                  <p>{item.product_name}</p>
-                  <div className="flex justify-between">
-                    <span>{item.qty} {item.unit_name} x {formatRp(item.price)}</span>
-                    <span>{formatRp(item.qty * item.price)}</span>
-                  </div>
-                </div>
-              ))}
-              <div className="border-t border-dashed my-2" />
-              <div className="flex justify-between font-bold"><span>TOTAL RETUR</span><span>{formatRp(printReceipt.grandTotal)}</span></div>
-              <div className="border-t border-dashed my-2" />
-              <p className="text-center">Terima kasih!</p>
-            </div>
-            <DialogFooter>
-              <Button className="w-full gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+
       {printReceipt && (
         <Dialog open={!!printReceipt} onOpenChange={() => setPrintReceipt(null)}>
           <DialogContent className="max-w-xs">
