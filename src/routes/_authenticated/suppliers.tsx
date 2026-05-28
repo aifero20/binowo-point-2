@@ -137,7 +137,20 @@ function SuppliersPage() {
 
 function SupplierForm({ editing, onSubmit, loading }: { editing: Supplier | null; onSubmit: (f: Partial<Supplier>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Supplier>>(editing ?? { supplier_code: "", supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" });
-  useEffect(() => { setForm(editing ?? { supplier_code: "", supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" }); }, [editing]);
+
+  useEffect(() => {
+    if (editing) { setForm(editing); return; }
+    // Auto-generate kode supplier
+    supabase.from("suppliers").select("supplier_code").order("supplier_code", { ascending: false }).limit(100)
+      .then(({ data }) => {
+        const nums = (data ?? []).map((s: any) => {
+          const m = s.supplier_code?.match(/^SUP-(\d+)$/);
+          return m ? parseInt(m[1]) : 0;
+        });
+        const next = (Math.max(0, ...nums) + 1).toString().padStart(3, "0");
+        setForm({ supplier_code: `SUP-${next}`, supplier_name: "", city: "", phone: "", supplier_type: "ROKOK" });
+      });
+  }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Supplier" : "Tambah Supplier"}</DialogTitle></DialogHeader>

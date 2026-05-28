@@ -150,7 +150,20 @@ function CustomersPage() {
 
 function CustomerForm({ editing, onSubmit, loading }: { editing: Customer | null; onSubmit: (f: Partial<Customer>) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Customer>>(editing ?? { customer_code: "", customer_name: "", city: "", phone: "", customer_type: "RETAIL" });
-  useEffect(() => { setForm(editing ?? { customer_code: "", customer_name: "", city: "", phone: "", customer_type: "RETAIL" }); }, [editing]);
+
+  useEffect(() => {
+    if (editing) { setForm(editing); return; }
+    // Auto-generate kode customer
+    supabase.from("customers").select("customer_code").order("customer_code", { ascending: false }).limit(100)
+      .then(({ data }) => {
+        const nums = (data ?? []).map((c: any) => {
+          const m = c.customer_code?.match(/^CUS-(\d+)$/);
+          return m ? parseInt(m[1]) : 0;
+        });
+        const next = (Math.max(0, ...nums) + 1).toString().padStart(3, "0");
+        setForm({ customer_code: `CUS-${next}`, customer_name: "", city: "", phone: "", customer_type: "RETAIL" });
+      });
+  }, [editing]);
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{editing ? "Edit Customer" : "Tambah Customer"}</DialogTitle></DialogHeader>
