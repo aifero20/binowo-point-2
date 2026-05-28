@@ -26,11 +26,18 @@ const TYPE_COLORS: Record<string, "default" | "secondary" | "destructive"> = {
 
 const ALL_TYPES = ["LOGIN", "LOGOUT", "CREATE", "UPDATE", "DELETE", "VOID"];
 
+// Role yang boleh dilihat oleh masing-masing role
+const VISIBLE_ROLES: Record<string, string[]> = {
+  owner:      ["owner", "admin", "supervisor", "kasir"],
+  admin:      ["admin", "supervisor", "kasir"],
+  supervisor: ["supervisor", "kasir"],
+  kasir:      ["kasir"],
+};
+
 function ActivityLogsPage() {
   const { user, roles } = useAuth();
   const role = (roles[0] ?? "").toLowerCase();
-  const isKasir = role === "kasir";
-  const isSupervisor = role === "supervisor";
+  const visibleRoles = VISIBLE_ROLES[role] ?? ["kasir"];
 
   const [showFilter, setShowFilter] = useState(false);
   const [filterType, setFilterType] = useState("ALL");
@@ -39,37 +46,33 @@ function ActivityLogsPage() {
   const [filterTo, setFilterTo] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: usersList = [] } = useQuery({
-    queryKey: ["users-list-log"],
-    enabled: !isKasir,
+  // Ambil daftar user yang boleh dilihat lognya
+  const { data: allowedUsers = [] } = useQuery({
+    queryKey: ["users-allowed-log", role],
     queryFn: async () => {
-      let q = supabase.from("users").select("id, full_name, role_code").order("full_name");
-      if (isSupervisor) q = q.in("role_code", ["kasir", "supervisor"]);
-      const { data } = await q;
+      const { data } = await supabase
+        .from("users")
+        .select("id, full_name, role_code")
+        .in("role_code", visibleRoles)
+        .order("full_name");
       return data ?? [];
     },
   });
 
+  const allowedUserIds = allowedUsers.map((u: any) => u.id);
+
   const { data: allLogs = [], isLoading } = useQuery({
     queryKey: ["activity-logs", filterType, filterUser, filterFrom, filterTo, user?.id, role],
+    enabled: allowedUserIds.length > 0,
     queryFn: async () => {
       let q = supabase.from("activity_logs")
         .select("id, activity_time, activity_type, description, user_id")
         .order("activity_time", { ascending: false })
+        .in("user_id", allowedUserIds)
         .limit(500);
 
-      // Pembatasan berdasarkan role
-      if (isKasir) {
-        q = q.eq("user_id", user!.id);
-      } else if (isSupervisor) {
-        const { data: kasirUsers } = await supabase.from("users").select("id").eq("role_code", "kasir");
-        const kasirIds = (kasirUsers ?? []).map((u: any) => u.id);
-        const allowedIds = [...new Set([user!.id, ...kasirIds])];
-        q = q.in("user_id", allowedIds);
-      }
-
       if (filterType !== "ALL") q = q.eq("activity_type", filterType);
-      if (!isKasir && filterUser !== "ALL") q = q.eq("user_id", filterUser);
+      if (filterUser !== "ALL") q = q.eq("user_id", filterUser);
       if (filterFrom) q = q.gte("activity_time", filterFrom + "T00:00:00");
       if (filterTo) q = q.lte("activity_time", filterTo + "T23:59:59");
 
@@ -77,20 +80,17 @@ function ActivityLogsPage() {
       if (error) throw error;
       const logs = data as Log[];
 
-      const userIds = [...new Set(logs.map((l) => l.user_id).filter(Boolean))];
-      if (userIds.length > 0) {
-        const { data: users } = await supabase.from("users").select("id, full_name").in("id", userIds);
-        const userMap: Record<string, string> = {};
-        (users ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
-        return logs.map((l) => ({ ...l, kasir_name: l.user_id ? (userMap[l.user_id] ?? "-") : "-" }));
-      }
-      return logs.map((l) => ({ ...l, kasir_name: "-" }));
+      // Map user_id ke nama
+      const userMap: Record<string, string> = {};
+      (allowedUsers as any[]).forEach((u) => { userMap[u.id] = u.full_name; });
+      return logs.map((l) => ({ ...l, kasir_name: l.user_id ? (userMap[l.user_id] ?? "-") : "-" }));
     },
   });
 
   const totalPages = Math.max(1, Math.ceil(allLogs.length / PAGE_SIZE));
   const logs = allLogs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const isFiltered = filterType !== "ALL" || filterUser !== "ALL" || filterFrom || filterTo;
+  const canFilterUser = visibleRoles.length > 1;
 
   function resetFilter() {
     setFilterType("ALL"); setFilterUser("ALL");
@@ -120,14 +120,14 @@ function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {!isKasir && (
+              {canFilterUser && (
                 <div className="space-y-1.5">
                   <Label>User</Label>
                   <Select value={filterUser} onValueChange={(v) => { setFilterUser(v); setPage(1); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ALL">Semua User</SelectItem>
-                      {usersList.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>)}
+                      {allowedUsers.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
