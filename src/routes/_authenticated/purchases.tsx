@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingBag, SlidersHorizontal, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Plus, Trash2, ShoppingBag, SlidersHorizontal, ChevronLeft, ChevronRight, Download, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 import { useAuth } from "@/hooks/use-auth";
@@ -18,8 +18,8 @@ import { useRequireShift } from "@/hooks/use-require-shift";
 export const Route = createFileRoute("/_authenticated/purchases")({ component: PurchasesPage });
 
 type PurchaseLine = { product_id: string; product_name: string; unit_name: string; qty: number; buy_price: number; retail_price: number; wholesale_price: number };
-type PurchaseDetail = { qty: number; unit_name: string; buy_price: number; products: { product_name: string } | null };
-type PurchaseHeader = { id: string; purchase_number: string; transaction_date: string; grand_total: number; suppliers: { supplier_name: string } | null; purchase_details: PurchaseDetail[] };
+type PurchaseDetail = { qty: number; unit_name: string; buy_price: number; product_id: string; warehouse_id: string; retail_price: number; wholesale_price: number; products: { product_name: string } | null };
+type PurchaseHeader = { id: string; purchase_number: string; transaction_date: string; grand_total: number; invoice_number: string | null; payment_status: string; supplier_id: string; suppliers: { supplier_name: string } | null; purchase_details: PurchaseDetail[] };
 
 const PAGE_SIZE = 10;
 
@@ -32,33 +32,16 @@ function exportCSV(data: PurchaseHeader[], filterInfo: string, filterFrom: strin
   for (const h of data) {
     const details = h.purchase_details ?? [];
     if (details.length === 0) {
-      rows.push([
-        h.purchase_number,
-        new Date(h.transaction_date).toLocaleDateString("id-ID"),
-        h.suppliers?.supplier_name ?? "-",
-        "", "", "", "", "",
-        h.grand_total,
-      ].map(String).join(","));
+      rows.push([h.purchase_number, new Date(h.transaction_date).toLocaleDateString("id-ID"), h.suppliers?.supplier_name ?? "-", "", "", "", "", "", h.grand_total].map(String).join(","));
     } else {
       details.forEach((d, i) => {
-        rows.push([
-          i === 0 ? h.purchase_number : "",
-          i === 0 ? new Date(h.transaction_date).toLocaleDateString("id-ID") : "",
-          i === 0 ? (h.suppliers?.supplier_name ?? "-") : "",
-          d.products?.product_name ?? "-",
-          d.qty,
-          d.unit_name,
-          d.buy_price,
-          d.qty * d.buy_price,
-          i === 0 ? h.grand_total : "",
-        ].map(String).join(","));
+        rows.push([i === 0 ? h.purchase_number : "", i === 0 ? new Date(h.transaction_date).toLocaleDateString("id-ID") : "", i === 0 ? (h.suppliers?.supplier_name ?? "-") : "", d.products?.product_name ?? "-", d.qty, d.unit_name, d.buy_price, d.qty * d.buy_price, i === 0 ? h.grand_total : ""].map(String).join(","));
       });
     }
   }
   rows.push("");
   const grandTotal = data.reduce((s, h) => s + Number(h.grand_total), 0);
   rows.push(`,,,,,,,Total Keseluruhan,${grandTotal}`);
-
   const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -78,6 +61,7 @@ function PurchasesPage() {
   const qc = useQueryClient();
   if (needsShift && shiftLoading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Memeriksa shift...</p></div>;
   if (needsShift && !hasOpenShift) return null;
+
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<PurchaseLine[]>([]);
   const [supplierId, setSupplierId] = useState("");
@@ -86,6 +70,21 @@ function PurchasesPage() {
   const [paymentStatus, setPaymentStatus] = useState("LUNAS");
   const [dueDate, setDueDate] = useState("");
   const [searchProduct, setSearchProduct] = useState("");
+
+  // Edit state
+  const [editTarget, setEditTarget] = useState<PurchaseHeader | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLines, setEditLines] = useState<PurchaseLine[]>([]);
+  const [editSupplierId, setEditSupplierId] = useState("");
+  const [editWarehouseId, setEditWarehouseId] = useState("");
+  const [editInvoiceNumber, setEditInvoiceNumber] = useState("");
+  const [editPaymentStatus, setEditPaymentStatus] = useState("LUNAS");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editSearch, setEditSearch] = useState("");
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<PurchaseHeader | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [showFilter, setShowFilter] = useState(false);
   const [filterNoPO, setFilterNoPO] = useState("");
@@ -100,11 +99,11 @@ function PurchasesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchase_headers")
-        .select("id, purchase_number, transaction_date, grand_total, suppliers(supplier_name), purchase_details(qty, unit_name, buy_price, products(product_name))")
+        .select("id, purchase_number, transaction_date, grand_total, invoice_number, payment_status, supplier_id, suppliers(supplier_name), purchase_details(qty, unit_name, buy_price, product_id, warehouse_id, retail_price, wholesale_price, products(product_name))")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as PurchaseHeader[];
+      return data as unknown as PurchaseHeader[];
     },
   });
 
@@ -120,8 +119,8 @@ function PurchasesPage() {
 
   useEffect(() => {
     if (warehouses.length > 0 && !warehouseId) {
-      const utama = warehouses.find((w: any) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
-      setWarehouseId(utama.id);
+      const utama = (warehouses as any[]).find((w: any) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
+      setWarehouseId((utama as any).id);
     }
   }, [warehouses]);
 
@@ -136,14 +135,55 @@ function PurchasesPage() {
     },
   });
 
-  const grandTotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.buy_price, 0), [lines]);
+  const { data: editProducts = [] } = useQuery({
+    queryKey: ["pos-products-edit", editSearch],
+    queryFn: async () => {
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price").is("deleted_at", null).limit(20);
+      if (editSearch) q = q.or(`product_name.ilike.%${editSearch}%,product_code.ilike.%${editSearch}%`);
+      const { data } = await q;
+      return data ?? [];
+    },
+    enabled: editOpen,
+  });
 
-  function addLine(p: typeof products[0]) {
+  const grandTotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.buy_price, 0), [lines]);
+  const editGrandTotal = useMemo(() => editLines.reduce((s, l) => s + l.qty * l.buy_price, 0), [editLines]);
+
+  function addLine(p: any) {
     setLines((prev) => {
       const ex = prev.find((l) => l.product_id === p.id);
       if (ex) return prev.map((l) => l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l);
       return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_buy_price), retail_price: Number(p.current_retail_price), wholesale_price: Number(p.current_wholesale_price) }];
     });
+  }
+
+  function addEditLine(p: any) {
+    setEditLines((prev) => {
+      const ex = prev.find((l) => l.product_id === p.id);
+      if (ex) return prev.map((l) => l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l);
+      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_buy_price), retail_price: Number(p.current_retail_price), wholesale_price: Number(p.current_wholesale_price) }];
+    });
+  }
+
+  function openEdit(h: PurchaseHeader) {
+    setEditTarget(h);
+    setEditSupplierId(h.supplier_id);
+    setEditInvoiceNumber(h.invoice_number ?? "");
+    setEditPaymentStatus(h.payment_status ?? "LUNAS");
+    setEditDueDate("");
+    setEditSearch("");
+    const wh = h.purchase_details[0]?.warehouse_id ?? "";
+    setEditWarehouseId(wh || (warehouses.length > 0 ? (warehouses as any[])[0].id : ""));
+    setEditLines(h.purchase_details.map((d) => ({
+      product_id: d.product_id,
+      product_name: d.products?.product_name ?? "-",
+      unit_name: d.unit_name,
+      qty: d.qty,
+      buy_price: d.buy_price,
+      retail_price: d.retail_price ?? 0,
+      wholesale_price: d.wholesale_price ?? 0,
+    })));
+    setEditOpen(true);
   }
 
   const filtered = useMemo(() => {
@@ -201,6 +241,67 @@ function PurchasesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const update = useMutation({
+    mutationFn: async () => {
+      if (!editTarget) throw new Error("Tidak ada data");
+      if (!editSupplierId) throw new Error("Pilih supplier");
+      if (!editWarehouseId) throw new Error("Pilih gudang");
+      if (editLines.length === 0) throw new Error("Tambah item dulu");
+      const pid = editTarget.id;
+      const pno = editTarget.purchase_number;
+
+      // Reverse stock movement lama
+      const oldDetails = editTarget.purchase_details;
+      if (oldDetails.length > 0) {
+        await supabase.from("stock_movements").insert(
+          oldDetails.map((d) => ({ product_id: d.product_id, warehouse_id: d.warehouse_id || editWarehouseId, transaction_type: "purchase_edit_reverse", reference_number: pno, qty_out: d.qty, created_by: user!.id })) as never
+        );
+      }
+
+      // Update header
+      const { error: he } = await supabase.from("purchase_headers").update({ supplier_id: editSupplierId, invoice_number: editInvoiceNumber, payment_status: editPaymentStatus, subtotal: editGrandTotal, grand_total: editGrandTotal } as never).eq("id", pid);
+      if (he) throw he;
+
+      // Hapus detail lama, insert baru
+      await supabase.from("purchase_details").delete().eq("purchase_id", pid);
+      const newDetails = editLines.map((l) => ({ purchase_id: pid, product_id: l.product_id, warehouse_id: editWarehouseId, qty: l.qty, unit_name: l.unit_name, buy_price: l.buy_price, retail_price: l.retail_price, wholesale_price: l.wholesale_price, total: l.qty * l.buy_price }));
+      const { error: de } = await supabase.from("purchase_details").insert(newDetails as never);
+      if (de) throw de;
+
+      // Stock movement baru
+      await supabase.from("stock_movements").insert(
+        editLines.map((l) => ({ product_id: l.product_id, warehouse_id: editWarehouseId, transaction_type: "purchase", reference_number: pno, qty_in: l.qty, created_by: user!.id })) as never
+      );
+
+      // Update harga produk
+      for (const l of editLines) {
+        await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
+      }
+    },
+    onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      if (!deleteTarget) throw new Error("Tidak ada data");
+      const pid = deleteTarget.id;
+      const pno = deleteTarget.purchase_number;
+      // Reverse stok
+      const details = deleteTarget.purchase_details;
+      if (details.length > 0) {
+        await supabase.from("stock_movements").insert(
+          details.map((d) => ({ product_id: d.product_id, warehouse_id: d.warehouse_id || "", transaction_type: "purchase_delete_reverse", reference_number: pno, qty_out: d.qty, created_by: user!.id })) as never
+        );
+      }
+      // Soft delete
+      const { error } = await supabase.from("purchase_headers").update({ deleted_at: new Date().toISOString() } as never).eq("id", pid);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Pembelian dihapus"); qc.invalidateQueries(); setDeleteOpen(false); setDeleteTarget(null); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -221,13 +322,13 @@ function PurchasesPage() {
                   <div className="space-y-1.5"><Label>Supplier *</Label>
                     <Select value={supplierId} onValueChange={setSupplierId}>
                       <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-                      <SelectContent>{suppliers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{(suppliers as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5"><Label>Gudang *</Label>
                     <Select value={warehouseId} onValueChange={setWarehouseId}>
                       <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
-                      <SelectContent>{warehouses.map((w: any) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
+                      <SelectContent>{(warehouses as any[]).map((w: any) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5"><Label>No. Invoice</Label><Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Opsional" /></div>
@@ -248,7 +349,7 @@ function PurchasesPage() {
                   <Label>Cari Barang</Label>
                   <Input autoFocus placeholder="Cari nama / kode..." value={searchProduct} onChange={(e) => setSearchProduct(e.target.value)} />
                   <div className="border rounded max-h-48 overflow-y-auto divide-y">
-                    {products.map((p: any) => (
+                    {(products as any[]).map((p: any) => (
                       <div key={p.id} className="p-2 flex justify-between items-center text-sm hover:bg-accent cursor-pointer" onClick={() => addLine(p)}>
                         <span>{p.product_name}</span>
                         <span className="text-muted-foreground text-xs">{formatRp(p.current_buy_price)}</span>
@@ -295,9 +396,9 @@ function PurchasesPage() {
 
       <Card><CardContent className="p-0">
         <Table>
-          <TableHeader><TableRow><TableHead>No. PO</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>No. PO</TableHead><TableHead>Tanggal</TableHead><TableHead>Supplier</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
-            {paged.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada pembelian.</TableCell></TableRow>}
+            {paged.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Belum ada pembelian.</TableCell></TableRow>}
             {paged.map((h) => (
               <TableRow key={h.id}>
                 <TableCell className="font-mono text-xs">{h.purchase_number}</TableCell>
@@ -310,6 +411,12 @@ function PurchasesPage() {
                   {(h.purchase_details ?? []).length > 3 && <div className="text-muted-foreground">+{(h.purchase_details ?? []).length - 3} lainnya</div>}
                 </TableCell>
                 <TableCell className="text-right font-medium">{formatRp(h.grand_total)}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1 justify-end">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(h)}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => { setDeleteTarget(h); setDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -324,6 +431,84 @@ function PurchasesPage() {
           </div>
         )}
       </CardContent></Card>
+
+      {/* Dialog Edit */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5" />Edit Pembelian {editTarget?.purchase_number}</DialogTitle></DialogHeader>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="space-y-1.5"><Label>Supplier *</Label>
+                <Select value={editSupplierId} onValueChange={setEditSupplierId}>
+                  <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
+                  <SelectContent>{(suppliers as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Gudang *</Label>
+                <Select value={editWarehouseId} onValueChange={setEditWarehouseId}>
+                  <SelectTrigger><SelectValue placeholder="Pilih gudang..." /></SelectTrigger>
+                  <SelectContent>{(warehouses as any[]).map((w: any) => <SelectItem key={w.id} value={w.id}>{w.warehouse_name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>No. Invoice</Label><Input value={editInvoiceNumber} onChange={(e) => setEditInvoiceNumber(e.target.value)} placeholder="Opsional" /></div>
+              <div className="space-y-1.5"><Label>Status Pembayaran</Label>
+                <Select value={editPaymentStatus} onValueChange={setEditPaymentStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LUNAS">Lunas</SelectItem>
+                    <SelectItem value="HUTANG">Hutang</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editPaymentStatus === "HUTANG" && (
+                <div className="space-y-1.5"><Label>Jatuh Tempo</Label><Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cari Barang</Label>
+              <Input placeholder="Cari nama / kode..." value={editSearch} onChange={(e) => setEditSearch(e.target.value)} />
+              <div className="border rounded max-h-48 overflow-y-auto divide-y">
+                {(editProducts as any[]).map((p: any) => (
+                  <div key={p.id} className="p-2 flex justify-between items-center text-sm hover:bg-accent cursor-pointer" onClick={() => addEditLine(p)}>
+                    <span>{p.product_name}</span>
+                    <span className="text-muted-foreground text-xs">{formatRp(p.current_buy_price)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="border rounded divide-y mt-2">
+            {editLines.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Belum ada item</p>}
+            {editLines.map((l, i) => (
+              <div key={i} className="p-2 grid grid-cols-[1fr_80px_120px_120px_40px] gap-2 items-center text-sm">
+                <span className="truncate font-medium">{l.product_name}</span>
+                <Input type="number" min={1} value={l.qty} onChange={(e) => setEditLines((ls) => ls.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="h-8" />
+                <Input type="number" value={l.buy_price} onChange={(e) => setEditLines((ls) => ls.map((x, j) => j === i ? { ...x, buy_price: Number(e.target.value) } : x))} className="h-8" placeholder="Harga beli" />
+                <span className="text-right text-muted-foreground">{formatRp(l.qty * l.buy_price)}</span>
+                <Button size="icon" variant="ghost" onClick={() => setEditLines((ls) => ls.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center font-bold text-lg border-t pt-3">
+            <span>Total</span><span className="text-primary">{formatRp(editGrandTotal)}</span>
+          </div>
+          <DialogFooter><Button size="lg" onClick={() => update.mutate()} disabled={update.isPending}>{update.isPending ? "Menyimpan..." : "Simpan Perubahan"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Konfirmasi Delete */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Hapus Pembelian?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Pembelian <span className="font-mono font-bold">{deleteTarget?.purchase_number}</span> dari <span className="font-bold">{deleteTarget?.suppliers?.supplier_name ?? "-"}</span> akan dihapus dan stok akan di-reverse. Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
+            <Button variant="destructive" onClick={() => remove.mutate()} disabled={remove.isPending}>{remove.isPending ? "Menghapus..." : "Ya, Hapus"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
