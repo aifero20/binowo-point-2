@@ -13,7 +13,7 @@ import { SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/activity-logs")({ component: ActivityLogsPage });
 
-type Log = { id: string; activity_time: string; activity_type: string; table_name: string | null; description: string | null; user_id: string | null; users?: { full_name: string } | null };
+type Log = { id: string; activity_time: string; activity_type: string; table_name: string | null; description: string | null; user_id: string | null; kasir_name?: string };
 
 const PAGE_SIZE = 10;
 
@@ -52,7 +52,7 @@ function ActivityLogsPage() {
       (usersData ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
 
       let q = supabase.from("activity_logs")
-        .select("id, activity_time, activity_type, table_name, description, user_id, users(full_name)")
+        .select("id, activity_time, activity_type, table_name, description, user_id")
         .order("activity_time", { ascending: false })
         .limit(500);
       if (filterType !== "ALL") q = q.eq("activity_type", filterType);
