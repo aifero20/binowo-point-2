@@ -68,7 +68,7 @@ function ActivityLogsPage() {
 
   const totalPages = Math.max(1, Math.ceil(allLogs.length / PAGE_SIZE));
   const logs = allLogs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const isFiltered = filterType !== "ALL" || filterTable !== "ALL" || filterUser !== "ALL" || filterFrom || filterTo;
+  const isFiltered = filterType !== "ALL" || filterUser !== "ALL" || filterFrom || filterTo;
 
   function resetFilter() {
     setFilterType("ALL"); setFilterTable("ALL"); setFilterUser("ALL");
@@ -98,16 +98,7 @@ function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Tabel</Label>
-                <Select value={filterTable} onValueChange={(v) => { setFilterTable(v); setPage(1); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Semua Tabel</SelectItem>
-                    {ALL_TABLES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div className="space-y-1.5">
                 <Label>User</Label>
                 <Select value={filterUser} onValueChange={(v) => { setFilterUser(v); setPage(1); }}>
@@ -138,8 +129,7 @@ function ActivityLogsPage() {
             <TableHead>Waktu</TableHead>
             <TableHead>User</TableHead>
             <TableHead>Tipe</TableHead>
-            <TableHead>Tabel</TableHead>
-            <TableHead>Deskripsi</TableHead>
+<TableHead>Deskripsi</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Memuat...</TableCell></TableRow>}
@@ -149,8 +139,7 @@ function ActivityLogsPage() {
                 <TableCell className="text-xs whitespace-nowrap">{new Date(l.activity_time).toLocaleString("id-ID")}</TableCell>
                 <TableCell className="text-sm font-medium">{(l as any)._userName ?? "-"}</TableCell>
                 <TableCell><Badge variant={TYPE_COLORS[l.activity_type] ?? "secondary"} className="text-xs">{l.activity_type}</Badge></TableCell>
-                <TableCell className="text-xs text-muted-foreground">{l.table_name ?? "-"}</TableCell>
-                <TableCell className="text-sm">{l.description ?? "-"}</TableCell>
+<TableCell className="text-sm">{l.description ?? "-"}</TableCell>
               </TableRow>
             ))}
           </TableBody>

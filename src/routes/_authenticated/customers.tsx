@@ -20,6 +20,7 @@ const PAGE_SIZE = 10;
 
 function CustomersPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [editing, setEditing] = useState<Customer | null>(null);
   const [open, setOpen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
@@ -60,7 +61,7 @@ function CustomersPage() {
       const { error } = await op;
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Customer disimpan"); qc.invalidateQueries({ queryKey: ["customers"] }); setOpen(false); setEditing(null); },
+    onSuccess: () => { toast.success("Customer disimpan"); void logActivity(user?.id, editing ? "UPDATE" : "CREATE", editing ? `Customer diupdate: ${editing.customer_name}` : "Customer baru ditambahkan"); qc.invalidateQueries({ queryKey: ["customers"] }); setOpen(false); setEditing(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -69,7 +70,7 @@ function CustomersPage() {
       const { error } = await supabase.from("customers").update({ deleted_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Customer dihapus"); qc.invalidateQueries({ queryKey: ["customers"] }); },
+    onSuccess: () => { toast.success("Customer dihapus"); void logActivity(user?.id, "DELETE", "Customer dihapus"); qc.invalidateQueries({ queryKey: ["customers"] }); },
   });
 
   return (
