@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/activity-logs")({ component: ActivityLogsPage });
 
-type Log = { id: string; activity_time: string; activity_type: string; table_name: string | null; description: string | null; user_id: string | null; kasir_name?: string };
+type Log = { id: string; activity_time: string; activity_type: string; description: string | null; user_id: string | null; kasir_name?: string };
 
 const PAGE_SIZE = 10;
 
@@ -24,45 +25,66 @@ const TYPE_COLORS: Record<string, "default" | "secondary" | "destructive"> = {
 };
 
 const ALL_TYPES = ["LOGIN", "LOGOUT", "CREATE", "UPDATE", "DELETE", "VOID"];
-const ALL_TABLES = ["sales_headers", "purchase_headers", "purchase_returns", "products", "users", "warehouses"];
 
 function ActivityLogsPage() {
+  const { user, roles } = useAuth();
+  const role = (roles[0] ?? "").toLowerCase();
+  const isKasir = role === "kasir";
+  const isSupervisor = role === "supervisor";
+
   const [showFilter, setShowFilter] = useState(false);
   const [filterType, setFilterType] = useState("ALL");
-  const [filterTable, setFilterTable] = useState("ALL");
   const [filterUser, setFilterUser] = useState("ALL");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: users = [] } = useQuery({
+  const { data: usersList = [] } = useQuery({
     queryKey: ["users-list-log"],
+    enabled: !isKasir,
     queryFn: async () => {
-      const { data } = await supabase.from("users").select("id, full_name").order("full_name");
+      let q = supabase.from("users").select("id, full_name, role_code").order("full_name");
+      if (isSupervisor) q = q.in("role_code", ["kasir", "supervisor"]);
+      const { data } = await q;
       return data ?? [];
     },
   });
 
   const { data: allLogs = [], isLoading } = useQuery({
-    queryKey: ["activity-logs", filterType, filterTable, filterUser, filterFrom, filterTo],
+    queryKey: ["activity-logs", filterType, filterUser, filterFrom, filterTo, user?.id, role],
     queryFn: async () => {
-      // Fetch users map dulu
-      const { data: usersData } = await supabase.from("users").select("id, full_name");
-      const userMap: Record<string, string> = {};
-      (usersData ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
-
       let q = supabase.from("activity_logs")
-        .select("id, activity_time, activity_type, table_name, description, user_id")
+        .select("id, activity_time, activity_type, description, user_id")
         .order("activity_time", { ascending: false })
         .limit(500);
+
+      // Pembatasan berdasarkan role
+      if (isKasir) {
+        q = q.eq("user_id", user!.id);
+      } else if (isSupervisor) {
+        const { data: kasirUsers } = await supabase.from("users").select("id").eq("role_code", "kasir");
+        const kasirIds = (kasirUsers ?? []).map((u: any) => u.id);
+        const allowedIds = [...new Set([user!.id, ...kasirIds])];
+        q = q.in("user_id", allowedIds);
+      }
+
       if (filterType !== "ALL") q = q.eq("activity_type", filterType);
-      if (filterTable !== "ALL") q = q.eq("table_name", filterTable);
-      if (filterUser !== "ALL") q = q.eq("user_id", filterUser);
+      if (!isKasir && filterUser !== "ALL") q = q.eq("user_id", filterUser);
       if (filterFrom) q = q.gte("activity_time", filterFrom + "T00:00:00");
       if (filterTo) q = q.lte("activity_time", filterTo + "T23:59:59");
+
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []).map((l: any) => ({ ...l, _userName: userMap[l.user_id] ?? "-" }));
+      const logs = data as Log[];
+
+      const userIds = [...new Set(logs.map((l) => l.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: users } = await supabase.from("users").select("id, full_name").in("id", userIds);
+        const userMap: Record<string, string> = {};
+        (users ?? []).forEach((u: any) => { userMap[u.id] = u.full_name; });
+        return logs.map((l) => ({ ...l, kasir_name: l.user_id ? (userMap[l.user_id] ?? "-") : "-" }));
+      }
+      return logs.map((l) => ({ ...l, kasir_name: "-" }));
     },
   });
 
@@ -71,7 +93,7 @@ function ActivityLogsPage() {
   const isFiltered = filterType !== "ALL" || filterUser !== "ALL" || filterFrom || filterTo;
 
   function resetFilter() {
-    setFilterType("ALL"); setFilterTable("ALL"); setFilterUser("ALL");
+    setFilterType("ALL"); setFilterUser("ALL");
     setFilterFrom(""); setFilterTo(""); setPage(1);
   }
 
@@ -98,17 +120,18 @@ function ActivityLogsPage() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-1.5">
-                <Label>User</Label>
-                <Select value={filterUser} onValueChange={(v) => { setFilterUser(v); setPage(1); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Semua User</SelectItem>
-                    {users.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isKasir && (
+                <div className="space-y-1.5">
+                  <Label>User</Label>
+                  <Select value={filterUser} onValueChange={(v) => { setFilterUser(v); setPage(1); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua User</SelectItem>
+                      {usersList.map((u: any) => <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Dari Tanggal</Label>
                 <Input type="date" value={filterFrom} onChange={(e) => { setFilterFrom(e.target.value); setPage(1); }} />
@@ -129,17 +152,17 @@ function ActivityLogsPage() {
             <TableHead>Waktu</TableHead>
             <TableHead>User</TableHead>
             <TableHead>Tipe</TableHead>
-<TableHead>Deskripsi</TableHead>
+            <TableHead>Deskripsi</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Memuat...</TableCell></TableRow>}
-            {!isLoading && logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Belum ada log.</TableCell></TableRow>}
+            {isLoading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Memuat...</TableCell></TableRow>}
+            {!isLoading && logs.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Belum ada log.</TableCell></TableRow>}
             {logs.map((l) => (
               <TableRow key={l.id}>
                 <TableCell className="text-xs whitespace-nowrap">{new Date(l.activity_time).toLocaleString("id-ID")}</TableCell>
-                <TableCell className="text-sm font-medium">{(l as any)._userName ?? "-"}</TableCell>
+                <TableCell className="text-sm font-medium">{l.kasir_name ?? "-"}</TableCell>
                 <TableCell><Badge variant={TYPE_COLORS[l.activity_type] ?? "secondary"} className="text-xs">{l.activity_type}</Badge></TableCell>
-<TableCell className="text-sm">{l.description ?? "-"}</TableCell>
+                <TableCell className="text-sm">{l.description ?? "-"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
