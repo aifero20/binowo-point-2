@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,9 +181,9 @@ function SalesPOS() {
   const subtotal = useMemo(() => subtotalBeforeDiscount * (1 - headerDiscount / 100), [subtotalBeforeDiscount, headerDiscount]);
   const change = paymentAmount - subtotal;
 
-  function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number }, unitName?: string, price?: number, conv?: number) {
+  function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number; current_wholesale_price?: number }, unitName?: string, price?: number, conv?: number) {
     const unit = unitName ?? p.default_unit;
-    const sp = price ?? Number(p.current_retail_price);
+    const sp = price ?? (selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price));
     setCart((prev) => {
       const existing = prev.find((l) => l.product_id === p.id && l.unit_name === unit);
       if (existing) return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l);
@@ -295,7 +295,7 @@ function SalesPOS() {
             </Card>
 
             <Card className="h-fit sticky top-20">
-              <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">● OFFLINE</span>}</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">â— OFFLINE</span>}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
@@ -358,7 +358,7 @@ function SalesPOS() {
                     <div key={i} className="p-2 flex gap-2 items-center text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{l.product_name}</p>
-                        <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} × {l.qty}</p>
+                        <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} Ã— {l.qty}</p>
                       </div>
                       <Input type="number" min={1} value={l.qty} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="w-16 h-8" />
                       <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value), selling_price: x.selling_price } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
@@ -424,7 +424,7 @@ function SalesPOS() {
                     <TableCell className="text-sm">{(h as any).customers?.customer_name ?? <span className="text-muted-foreground text-xs">Umum</span>}</TableCell>
                     <TableCell className="text-xs max-w-[200px]">
                       {((h as any).sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
-                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty}</span></div>
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">Ã—{d.qty}</span></div>
                       ))}
                       {((h as any).sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{((h as any).sales_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
