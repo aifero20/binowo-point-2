@@ -279,23 +279,23 @@ function PurchasesPage() {
         await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
       }
       // Update supplier_debts jika ada
-      const { data: debtData } = await supabase.from("supplier_debts").select("id, paid_amount").eq("purchase_id", pid).single();
-      if (debtData) {
-        const paidSoFar = Number(debtData.paid_amount);
-        const newRemaining = editGrandTotal - paidSoFar;
-        const newStatus = newRemaining <= 0 ? "LUNAS" : "BELUM_LUNAS";
-        await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus, due_date: editDueDate || null } as never).eq("id", debtData.id);
+      // Update supplier_debts sesuai perubahan status pembayaran
+      const { data: debtData } = await supabase.from("supplier_debts").select("id, paid_amount").eq("purchase_id", pid).maybeSingle();
+      if (editPaymentStatus === "HUTANG") {
+        if (debtData) {
+          // Update existing debt
+          const paidSoFar = Number(debtData.paid_amount);
+          const newRemaining = editGrandTotal - paidSoFar;
+          const newStatus = newRemaining <= 0 ? "LUNAS" : "BELUM_LUNAS";
+          await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus, due_date: editDueDate || null } as never).eq("id", debtData.id);
+        } else {
+          // Insert baru karena sebelumnya LUNAS
+          await supabase.from("supplier_debts").insert({ supplier_id: editSupplierId, purchase_id: pid, amount: editGrandTotal, paid_amount: 0, remaining: editGrandTotal, due_date: editDueDate || null, status: "BELUM_LUNAS" } as never);
+        }
+      } else {
+        // Status LUNAS - hapus debt jika ada
+        if (debtData) await supabase.from("supplier_debts").delete().eq("id", debtData.id);
       }
-    },
-    onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); triggerSheetsSync("purchases"); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const remove = useMutation({
-    mutationFn: async () => {
-      if (!deleteTarget) throw new Error("Tidak ada data");
-      const pid = deleteTarget.id;
-      const pno = deleteTarget.purchase_number;
       // Reverse stok
       const details = deleteTarget.purchase_details;
       if (details.length > 0) {
