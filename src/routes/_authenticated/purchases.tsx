@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { triggerSheetsSync } from "@/lib/sync";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -237,7 +238,7 @@ function PurchasesPage() {
         await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
       }
     },
-    onSuccess: () => { toast.success("Pembelian disimpan"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setWarehouseId(""); setInvoiceNumber(""); setDueDate(""); },
+    onSuccess: () => { toast.success("Pembelian disimpan"); qc.invalidateQueries(); setOpen(false); setLines([]); setSupplierId(""); setWarehouseId(""); setInvoiceNumber(""); setDueDate(""); triggerSheetsSync("purchases"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -286,7 +287,7 @@ function PurchasesPage() {
         await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus, due_date: editDueDate || null } as never).eq("id", debtData.id);
       }
     },
-    onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); },
+    onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); triggerSheetsSync("purchases"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -306,7 +307,7 @@ function PurchasesPage() {
       const { error } = await supabase.from("purchase_headers").update({ deleted_at: new Date().toISOString() } as never).eq("id", pid);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Pembelian dihapus"); qc.invalidateQueries(); setDeleteOpen(false); setDeleteTarget(null); },
+    onSuccess: () => { toast.success("Pembelian dihapus"); qc.invalidateQueries(); setDeleteOpen(false); setDeleteTarget(null); triggerSheetsSync("purchases"); },
     onError: (e: Error) => toast.error(e.message),
   });
 

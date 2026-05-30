@@ -1,4 +1,4 @@
-import { offlineDb } from "./offline-db";
+﻿import { offlineDb } from "./offline-db";
 import { supabase } from "@/integrations/supabase/client";
 
 export async function syncOfflineSales(userId: string): Promise<{ synced: number; failed: number }> {
@@ -82,5 +82,19 @@ export async function cacheProducts() {
     }
   } catch {
     // offline, skip
+  }
+}
+
+export async function triggerSheetsSync(type: "sales" | "purchases" | "all" = "all"): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    await fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ type }),
+    });
+  } catch {
+    // silent fail - sync sheet tidak boleh ganggu transaksi utama
   }
 }
