@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -277,6 +277,14 @@ function PurchasesPage() {
       for (const l of editLines) {
         await supabase.from("products").update({ current_buy_price: l.buy_price, current_retail_price: l.retail_price, current_wholesale_price: l.wholesale_price } as never).eq("id", l.product_id);
       }
+      // Update supplier_debts jika ada
+      const { data: debtData } = await supabase.from("supplier_debts").select("id, paid_amount").eq("purchase_id", pid).single();
+      if (debtData) {
+        const paidSoFar = Number(debtData.paid_amount);
+        const newRemaining = editGrandTotal - paidSoFar;
+        const newStatus = newRemaining <= 0 ? "LUNAS" : "BELUM_LUNAS";
+        await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus } as never).eq("id", debtData.id);
+      }
     },
     onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); },
     onError: (e: Error) => toast.error(e.message),
@@ -406,7 +414,7 @@ function PurchasesPage() {
                 <TableCell>{h.suppliers?.supplier_name ?? "-"}</TableCell>
                 <TableCell className="text-xs max-w-[220px]">
                   {(h.purchase_details ?? []).slice(0, 3).map((d, i) => (
-                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">×{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
+                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">Ã—{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
                   ))}
                   {(h.purchase_details ?? []).length > 3 && <div className="text-muted-foreground">+{(h.purchase_details ?? []).length - 3} lainnya</div>}
                 </TableCell>
