@@ -296,6 +296,16 @@ function PurchasesPage() {
         // Status LUNAS - hapus debt jika ada
         if (debtData) await supabase.from("supplier_debts").delete().eq("id", debtData.id);
       }
+    },
+    onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); triggerSheetsSync("purchases"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      if (!deleteTarget) throw new Error("Tidak ada data");
+      const pid = deleteTarget.id;
+      const pno = deleteTarget.purchase_number;
       // Reverse stok
       const details = deleteTarget.purchase_details;
       if (details.length > 0) {
