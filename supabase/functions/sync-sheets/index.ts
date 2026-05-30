@@ -133,12 +133,10 @@ serve(async (req) => {
       const { data: usersData } = await supabase.from("users").select("id, full_name").is("deleted_at", null);
       const userMap: Record<string, string> = {};
       (usersData ?? []).forEach((u: Record<string, unknown>) => { userMap[u.id as string] = u.full_name as string; });
-
       const { data: sales, error: salesError } = await supabase
         .from("sales_headers")
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
-        .gte("created_at", yesterday)
-        .is("deleted_at", null);
+        .order("created_at", { ascending: false });
       console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
