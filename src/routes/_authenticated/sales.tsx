@@ -154,13 +154,13 @@ function SalesPOS() {
 
   // Re-apply diskon saat customer berubah
   useEffect(() => {
-    if (!productDiscountMap) return;
     setCart((c) => c.map((item) => {
       const discPct = productDiscountMap?.[item.product_id]?.[selectedCustomerType] ?? 0;
-      return { ...item, discount: discPct };
+      const prod = (products as any[]).find((p) => p.id === item.product_id);
+      const newPrice = prod ? (selectedCustomerType === "GROSIR" ? Number(prod.current_wholesale_price ?? prod.current_retail_price) : Number(prod.current_retail_price)) : item.selling_price;
+      return { ...item, discount: discPct, selling_price: newPrice };
     }));
-  }, [selectedCustomerType, productDiscountMap]);
-
+  }, [selectedCustomerType, productDiscountMap, products]);
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => {
     const gross = l.qty * l.selling_price;
     const disc = l.discount ?? 0;
