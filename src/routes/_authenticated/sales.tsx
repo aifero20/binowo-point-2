@@ -492,6 +492,13 @@ function SalesPOS() {
                         ))}
                         {((s as any).sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{((s as any).sales_details ?? []).length - 3} lainnya</div>}
                       </TableCell>
+                      <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
+                      <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
+                      <TableCell>
+                        {s.transaction_status === "SELESAI" && (
+                          <Button size="icon" variant="ghost" title="Void" onClick={() => setVoidDialog(s.id)}><XCircle className="h-4 w-4 text-destructive" /></Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
