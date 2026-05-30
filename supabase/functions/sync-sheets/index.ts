@@ -187,18 +187,26 @@ serve(async (req) => {
     if (type === "purchases" || type === "all") {
       const { data: purchases } = await supabase
         .from("purchase_headers")
-        .select("purchase_number, transaction_date, created_at, grand_total, payment_status, suppliers(supplier_name)")
+        .select("purchase_number, invoice_number, transaction_date, created_at, grand_total, payment_status, suppliers(supplier_name), purchase_details(qty, unit_name, buy_price, products(product_name))")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (purchases && purchases.length > 0) {
         const purchaseRows: unknown[][] = [];
-        purchaseRows.push(["No. PO","Tanggal","Supplier","Grand Total","Status Bayar"]);
+        purchaseRows.push(["No. PO","No. Invoice","Tanggal","Supplier","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Grand Total","Status Bayar"]);
         for (const p of purchases as Record<string, unknown>[]) {
           const dt = new Date((p.transaction_date ?? p.created_at) as string);
           const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
           const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
           const supplier = (p.suppliers as Record<string,unknown>)?.supplier_name ?? "-";
-          purchaseRows.push([p.purchase_number, tgl, supplier, p.grand_total, p.payment_status ?? "-"]);
+          const details = (p.purchase_details as Record<string,unknown>[]) ?? [];
+          const itemList = details.length > 0 ? details : [null];
+          itemList.forEach((d, idx) => {
+            const produk = d ? ((d.products as Record<string,unknown>)?.product_name ?? "-") : "-";
+            const qty = d ? Number(d.qty ?? 0) : 0;
+            const satuan = d ? (d.unit_name ?? "-") : "-";
+            const harga = d ? Number(d.buy_price ?? 0) : 0;
+            purchaseRows.push([idx === 0 ? p.purchase_number : "", idx === 0 ? (p.invoice_number ?? "-") : "", idx === 0 ? tgl : "", idx === 0 ? supplier : "", produk, qty, satuan, harga, qty * harga, idx === 0 ? p.grand_total : "", idx === 0 ? (p.payment_status ?? "-") : ""]);
+          });
         }
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Pembelian!A1?valueInputOption=RAW`, {
           method: "PUT",
