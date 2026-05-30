@@ -283,7 +283,7 @@ function PurchasesPage() {
         const paidSoFar = Number(debtData.paid_amount);
         const newRemaining = editGrandTotal - paidSoFar;
         const newStatus = newRemaining <= 0 ? "LUNAS" : "BELUM_LUNAS";
-        await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus } as never).eq("id", debtData.id);
+        await supabase.from("supplier_debts").update({ amount: editGrandTotal, remaining: newRemaining, status: newStatus, due_date: editDueDate || null } as never).eq("id", debtData.id);
       }
     },
     onSuccess: () => { toast.success("Pembelian diperbarui"); qc.invalidateQueries(); setEditOpen(false); setEditTarget(null); setEditLines([]); },
