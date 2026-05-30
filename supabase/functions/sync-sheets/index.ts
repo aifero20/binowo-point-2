@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -139,7 +139,7 @@ serve(async (req) => {
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
         .gte("created_at", yesterday)
         .is("deleted_at", null)
-        .neq("transaction_status", "VOID");
+        .is("deleted_at", null);
       console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
@@ -191,21 +191,27 @@ serve(async (req) => {
       const today = new Date().toISOString().split("T")[0];
       const { data: purchases } = await supabase
         .from("purchase_headers")
-        .select("purchase_number, transaction_date, created_at, grand_total, payment_status")
-        .gte("created_at", today)
-        .is("deleted_at", null);
-
+      const { data: purchases } = await supabase
+        .from("purchase_headers")
+        .select("purchase_number, transaction_date, created_at, grand_total, payment_status, suppliers(supplier_name)")
+        .order("created_at", { ascending: false });
       if (purchases && purchases.length > 0) {
-        const rows = purchases.map((p: Record<string, unknown>) => [
-          p.purchase_number,
-          new Date((p.transaction_date ?? p.created_at) as string).toLocaleString("id-ID"),
-          p.grand_total,
-          p.payment_status,
-        ]);
-        await appendToSheet(token, spreadsheetId, "Pembelian!A1", rows);
+        const purchaseRows: unknown[][] = [];
+        purchaseRows.push(["No. PO","Tanggal","Supplier","Grand Total","Status Bayar"]);
+        for (const p of purchases as Record<string, unknown>[]) {
+          const dt = new Date((p.transaction_date ?? p.created_at) as string);
+          const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
+          const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
+          const supplier = (p.suppliers as Record<string,unknown>)?.supplier_name ?? "-";
+          purchaseRows.push([p.purchase_number, tgl, supplier, p.grand_total, p.payment_status ?? "-"]);
+        }
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Pembelian!A1?valueInputOption=RAW`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ range: "Pembelian!A1", majorDimension: "ROWS", values: purchaseRows }),
+        });
       }
     }
-
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
