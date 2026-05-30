@@ -138,7 +138,6 @@ serve(async (req) => {
         .from("sales_headers")
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
         .gte("created_at", yesterday)
-        .is("deleted_at", null)
         .is("deleted_at", null);
       console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
       if (sales && sales.length > 0) {
@@ -188,12 +187,10 @@ serve(async (req) => {
       }
     }
     if (type === "purchases" || type === "all") {
-      const today = new Date().toISOString().split("T")[0];
-      const { data: purchases } = await supabase
-        .from("purchase_headers")
       const { data: purchases } = await supabase
         .from("purchase_headers")
         .select("purchase_number, transaction_date, created_at, grand_total, payment_status, suppliers(supplier_name)")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (purchases && purchases.length > 0) {
         const purchaseRows: unknown[][] = [];
