@@ -358,7 +358,7 @@ function SalesPOS() {
                     <div key={i} className="p-2 flex gap-2 items-center text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{l.product_name}</p>
-                        <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} Ã— {l.qty}</p>
+                        <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} x {l.qty}</p>
                       </div>
                       <Input type="number" min={1} value={l.qty} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="w-16 h-8" />
                       <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value), selling_price: x.selling_price } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
