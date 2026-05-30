@@ -1,6 +1,6 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ function SalesPOS() {
   }, []);
   const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string; method: string } | null>(null);
 
+  const [activeCartIdx, setActiveCartIdx] = useState<number | null>(null);
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
     queryFn: async () => {
@@ -186,8 +187,8 @@ function SalesPOS() {
     const sp = price ?? (selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price));
     setCart((prev) => {
       const existing = prev.find((l) => l.product_id === p.id && l.unit_name === unit);
-      if (existing) return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l);
-      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp }];
+      if (existing) { setActiveCartIdx(prev.indexOf(existing)); return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l); }
+      setActiveCartIdx(prev.length);
     });
   }
 
@@ -360,7 +361,7 @@ function SalesPOS() {
                         <p className="font-medium truncate">{l.product_name}</p>
                         <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} x {l.qty}</p>
                       </div>
-                      <Input type="number" min={1} value={l.qty} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))} className="w-16 h-8" />
+                      <Input type="number" min={1} value={l.qty} onChange={(e) => { setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) || 1 } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className="w-16 h-8" />
                       <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value), selling_price: x.selling_price } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
                       <Button size="icon" variant="ghost" onClick={() => setCart((c) => c.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
