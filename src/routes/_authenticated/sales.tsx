@@ -189,9 +189,9 @@ function SalesPOS() {
       const existing = prev.find((l) => l.product_id === p.id && l.unit_name === unit);
       if (existing) { setActiveCartIdx(prev.indexOf(existing)); return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l); }
       setActiveCartIdx(prev.length);
+      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp }];
     });
   }
-
   const checkout = useMutation({
     mutationFn: async () => {
       if (cart.length === 0) throw new Error("Keranjang kosong");
