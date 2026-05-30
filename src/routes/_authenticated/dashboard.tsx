@@ -8,22 +8,68 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, SlidersHorizontal } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { TrendingUp, ShoppingCart, Package, AlertTriangle } from "lucide-react";
 import { formatRp } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
 
+function getDateRange(preset: string): { from: string; to: string } {
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  if (preset === "today") return { from: fmt(today), to: fmt(today) };
+  if (preset === "7d") { const f = new Date(today); f.setDate(f.getDate() - 6); return { from: fmt(f), to: fmt(today) }; }
+  if (preset === "30d") { const f = new Date(today); f.setDate(f.getDate() - 29); return { from: fmt(f), to: fmt(today) }; }
+  if (preset === "90d") { const f = new Date(today); f.setDate(f.getDate() - 89); return { from: fmt(f), to: fmt(today) }; }
+  if (preset === "thismonth") { const f = new Date(today.getFullYear(), today.getMonth(), 1); return { from: fmt(f), to: fmt(today) }; }
+  if (preset === "lastmonth") {
+    const f = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const t = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { from: fmt(f), to: fmt(t) };
+  }
+  return { from: fmt(today), to: fmt(today) };
+}
+
+const PRESETS = [
+  { key: "today", label: "Hari Ini" },
+  { key: "7d", label: "7 Hari" },
+  { key: "thismonth", label: "Bulan Ini" },
+  { key: "lastmonth", label: "Bulan Lalu" },
+  { key: "30d", label: "30 Hari" },
+  { key: "90d", label: "90 Hari" },
+];
+
 function DashboardPage() {
   const today = new Date().toISOString().split("T")[0];
-  const [showFilter, setShowFilter] = useState(false);
-  const [filterFrom, setFilterFrom] = useState(today);
-  const [filterTo, setFilterTo] = useState(today);
-  const [chartMode, setChartMode] = useState<"daily" | "monthly">("daily");
+  const [activePreset, setActivePreset] = useState("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
+  const { from: filterFrom, to: filterTo } = useMemo(() => {
+    if (customFrom && customTo) return { from: customFrom, to: customTo };
+    return getDateRange(activePreset);
+  }, [activePreset, customFrom, customTo]);
+
+  const chartMode = useMemo(() => {
+    const diffDays = (new Date(filterTo).getTime() - new Date(filterFrom).getTime()) / 86400000;
+    return diffDays > 31 ? "monthly" : "daily";
+  }, [filterFrom, filterTo]);
+
+  function handlePreset(key: string) {
+    setActivePreset(key);
+    setCustomFrom("");
+    setCustomTo("");
+  }
+
+  function handleCustomDate(from: string, to: string) {
+    setCustomFrom(from);
+    setCustomTo(to);
+    setActivePreset("");
+  }
 
   // --- QUERIES ---
   const { data: todaySales = 0 } = useQuery({
-    queryKey: ["dash-today-sales", filterFrom, filterTo],
+    queryKey: ["dash-sales", filterFrom, filterTo],
     queryFn: async () => {
       const { data } = await supabase.from("sales_headers").select("grand_total")
         .gte("transaction_date", filterFrom).lte("transaction_date", filterTo + "T23:59:59")
@@ -33,7 +79,7 @@ function DashboardPage() {
   });
 
   const { data: todayCount = 0 } = useQuery({
-    queryKey: ["dash-today-count", filterFrom, filterTo],
+    queryKey: ["dash-count", filterFrom, filterTo],
     queryFn: async () => {
       const { count } = await supabase.from("sales_headers").select("*", { count: "exact", head: true })
         .gte("transaction_date", filterFrom).lte("transaction_date", filterTo + "T23:59:59")
@@ -62,7 +108,8 @@ function DashboardPage() {
         stockMap[m.product_id] += Number(m.qty_in) - Number(m.qty_out);
       }
       return data.filter((p: any) => (stockMap[p.id] ?? 0) <= p.minimum_stock)
-        .map((p: any) => ({ ...p, current_stock: stockMap[p.id] ?? 0 }));
+        .map((p: any) => ({ ...p, current_stock: stockMap[p.id] ?? 0 }))
+        .sort((a: any, b: any) => a.current_stock - b.current_stock);
     },
   });
 
@@ -74,64 +121,59 @@ function DashboardPage() {
         .neq("transaction_status", "VOID");
       const map: Record<string, number> = {};
       for (const r of (data ?? []) as any[]) {
-        const key = chartMode === "monthly"
-          ? r.transaction_date.substring(0, 7)
-          : r.transaction_date.split("T")[0];
+        const key = chartMode === "monthly" ? r.transaction_date.substring(0, 7) : r.transaction_date.split("T")[0];
         map[key] = (map[key] ?? 0) + Number(r.grand_total);
       }
-      return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date: chartMode === "monthly" ? date : date.slice(5), total }));
+      return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, total]) => ({ date: chartMode === "monthly" ? date : date.slice(5), total }));
     },
   });
 
   const { data: topProducts = [] } = useQuery({
     queryKey: ["dash-top-products", filterFrom, filterTo],
     queryFn: async () => {
-      const { data } = await supabase.from("sales_details").select("qty, product:product_id(product_name), sales:sales_id(transaction_date, transaction_status)")
-        .limit(2000);
-      const map: Record<string, { name: string; qty: number; total: number }> = {};
+      const { data } = await supabase.from("sales_details")
+        .select("qty, product:product_id(product_name), sales:sales_id(transaction_date, transaction_status)")
+        .limit(3000);
+      const map: Record<string, { name: string; qty: number }> = {};
       for (const d of (data ?? []) as any[]) {
         if (d.sales?.transaction_status === "VOID") continue;
         const tgl = (d.sales?.transaction_date ?? "").split("T")[0];
         if (tgl < filterFrom || tgl > filterTo) continue;
         const name = d.product?.product_name ?? "-";
-        if (!map[name]) map[name] = { name, qty: 0, total: 0 };
+        if (!map[name]) map[name] = { name, qty: 0 };
         map[name].qty += Number(d.qty);
       }
       return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 10);
     },
   });
 
-  const isFiltered = filterFrom !== today || filterTo !== today;
-
-  function resetFilter() { setFilterFrom(today); setFilterTo(today); }
-
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-muted-foreground">
-          {isFiltered ? `Filter: ${filterFrom} s/d ${filterTo}` : "Menampilkan data hari ini"}
-        </p>
-        <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter(v => !v)}>
-          <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
-        </Button>
-      </div>
-
-      {showFilter && (
-        <Card className="border-dashed">
-          <CardContent className="pt-4 pb-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} /></div>
+      {/* Filter Preset */}
+      <Card className="border-dashed">
+        <CardContent className="pt-4 pb-3 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map(p => (
+              <Button key={p.key} size="sm" variant={activePreset === p.key ? "default" : "outline"} onClick={() => handlePreset(p.key)}>{p.label}</Button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Custom: Dari Tanggal</Label>
+              <Input type="date" value={customFrom} onChange={e => handleCustomDate(e.target.value, customTo || filterTo)} />
             </div>
-            <div className="flex gap-2 mt-3">
-              <Button size="sm" variant={chartMode === "daily" ? "default" : "outline"} onClick={() => setChartMode("daily")}>Per Hari</Button>
-              <Button size="sm" variant={chartMode === "monthly" ? "default" : "outline"} onClick={() => setChartMode("monthly")}>Per Bulan</Button>
-              {isFiltered && <Button variant="ghost" size="sm" className="text-muted-foreground ml-auto" onClick={resetFilter}>Reset Filter</Button>}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Custom: Sampai Tanggal</Label>
+              <Input type="date" value={customTo} onChange={e => handleCustomDate(customFrom || filterFrom, e.target.value)} />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Menampilkan: <span className="font-medium text-foreground">{filterFrom} s/d {filterTo}</span>
+            {chartMode === "monthly" ? " — grafik ditampilkan per bulan" : " — grafik ditampilkan per hari"}
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -165,46 +207,48 @@ function DashboardPage() {
         </Card>
       </div>
 
-      {/* Chart Penjualan */}
+      {/* Chart */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Grafik Penjualan {chartMode === "daily" ? "Per Hari" : "Per Bulan"}</CardTitle>
-          <div className="flex gap-2">
-            <Button size="sm" variant={chartMode === "daily" ? "default" : "outline"} onClick={() => setChartMode("daily")}>Per Hari</Button>
-            <Button size="sm" variant={chartMode === "monthly" ? "default" : "outline"} onClick={() => setChartMode("monthly")}>Per Bulan</Button>
-          </div>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Grafik Penjualan {chartMode === "monthly" ? "Per Bulan" : "Per Hari"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v / 1000).toFixed(0) + "k"} />
-              <Tooltip formatter={(v: number) => formatRp(v)} />
-              <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {chartData.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Tidak ada data pada periode ini.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v / 1000).toFixed(0) + "k"} />
+                <Tooltip formatter={(v: number) => formatRp(v)} />
+                <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
 
-      {/* Top 10 Produk Terlaris */}
+      {/* Top 10 Produk */}
       <Card>
         <CardHeader><CardTitle className="text-base">Top 10 Produk Terlaris</CardTitle></CardHeader>
         <CardContent>
           {topProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Belum ada data penjualan.</p>
+            <p className="text-sm text-muted-foreground text-center py-4">Tidak ada data pada periode ini.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {topProducts.map((p, i) => (
                 <div key={p.name} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
+                  <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between text-sm mb-1">
                       <span className="font-medium truncate">{p.name}</span>
-                      <span className="text-muted-foreground ml-2 shrink-0">{p.qty} pcs</span>
+                      <span className="text-muted-foreground ml-2 shrink-0 text-xs">{p.qty} pcs</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(p.qty / topProducts[0].qty) * 100}%` }} />
+                      <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.round((p.qty / topProducts[0].qty) * 100)}%` }} />
                     </div>
                   </div>
                 </div>
