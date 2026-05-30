@@ -199,8 +199,8 @@ function SalesPOS() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
       const sales_number = "SO" + Date.now();
-      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal, grand_total: subtotal, discount: subtotalBeforeDiscount - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
-      if (he) throw he;
+      const grossTotal = cart.reduce((s, l) => s + l.qty * l.selling_price, 0);
+      const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal: grossTotal, grand_total: subtotal, discount: grossTotal - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
       await supabase.from("stock_movements").insert(cart.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "sale", reference_number: sales_number, qty_out: l.qty, created_by: user!.id })) as never);
