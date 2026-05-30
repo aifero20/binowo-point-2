@@ -122,7 +122,7 @@ function SalesPOS() {
   const { data: recentSales = [], refetch: refetchRecentSales } = useQuery({
     queryKey: ["recent-sales", historyFrom, historyTo],
     queryFn: async () => {
-      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, cashier_id, customers(customer_name)").order("created_at", { ascending: false }).limit(500);
+      let q = supabase.from("sales_headers").select("id, sales_number, grand_total, transaction_status, payment_method, created_at, cashier_id, customers(customer_name), sales_details(qty, unit_name, selling_price, products(product_name))").order("created_at", { ascending: false }).limit(500);
       if (historyFrom) q = q.gte("created_at", historyFrom + "T00:00:00");
       if (historyTo) q = q.lte("created_at", historyTo + "T23:59:59");
       const { data, error } = await q;
@@ -476,7 +476,7 @@ function SalesPOS() {
             )}
             <Card><CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Customer</TableHead><TableHead>Kasir</TableHead><TableHead>Metode</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Customer</TableHead><TableHead>Kasir</TableHead><TableHead>Metode</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
                 <TableBody>
                   {pagedSales.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
                   {pagedSales.map((s) => (
@@ -486,12 +486,11 @@ function SalesPOS() {
                       <TableCell className="text-xs">{(s as any).customers?.customer_name ?? <span className="text-muted-foreground">Umum</span>}</TableCell>
                       <TableCell className="text-xs">{(s as any).kasir_name ?? "-"}</TableCell>
                       <TableCell className="text-xs">{s.payment_method}</TableCell>
-                      <TableCell className="text-right font-medium">{formatRp(s.grand_total)}</TableCell>
-                      <TableCell><Badge variant={s.transaction_status === "VOID" ? "destructive" : s.transaction_status === "HOLD" ? "secondary" : "default"}>{s.transaction_status}</Badge></TableCell>
-                      <TableCell>
-                        {s.transaction_status === "SELESAI" && (
-                          <Button size="icon" variant="ghost" title="Void" onClick={() => setVoidDialog(s.id)}><XCircle className="h-4 w-4 text-destructive" /></Button>
-                        )}
+                      <TableCell className="text-xs max-w-[200px]">
+                        {((s as any).sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
+                          <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">x{d.qty} {d.unit_name} @ {formatRp(d.selling_price)}</span></div>
+                        ))}
+                        {((s as any).sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{((s as any).sales_details ?? []).length - 3} lainnya</div>}
                       </TableCell>
                     </TableRow>
                   ))}
