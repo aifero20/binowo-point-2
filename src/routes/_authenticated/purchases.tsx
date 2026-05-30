@@ -414,7 +414,7 @@ function PurchasesPage() {
                 <TableCell>{h.suppliers?.supplier_name ?? "-"}</TableCell>
                 <TableCell className="text-xs max-w-[220px]">
                   {(h.purchase_details ?? []).slice(0, 3).map((d, i) => (
-                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">Ã—{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
+                    <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">x{d.qty} {d.unit_name} @ {formatRp(d.buy_price)}</span></div>
                   ))}
                   {(h.purchase_details ?? []).length > 3 && <div className="text-muted-foreground">+{(h.purchase_details ?? []).length - 3} lainnya</div>}
                 </TableCell>
