@@ -160,7 +160,7 @@ function SalesPOS() {
       const newPrice = prod ? (selectedCustomerType === "GROSIR" ? Number(prod.current_wholesale_price ?? prod.current_retail_price) : Number(prod.current_retail_price)) : item.selling_price;
       return { ...item, discount: discPct, selling_price: newPrice };
     }));
-  }, [selectedCustomerType, productDiscountMap, products]);
+  }, [selectedCustomerType, productDiscountMap]);
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => {
     const gross = l.qty * l.selling_price;
     const disc = l.discount ?? 0;
