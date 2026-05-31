@@ -46,15 +46,9 @@ function DashboardPage() {
   async function syncToSheets() {
     setSyncing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ type: "all" }),
-      });
-      const result = await res.json();
-      if (result.success) toast.success("Berhasil sync ke Google Sheets!");
-      else toast.error("Sync gagal: " + JSON.stringify(result));
+      const { data, error } = await supabase.functions.invoke("sync-sheets", { body: { type: "all" } });
+      if (error) toast.error("Sync gagal: " + error.message);
+      else toast.success("Berhasil sync ke Google Sheets!");
     } catch (e) {
       toast.error("Sync error: " + String(e));
     } finally {
