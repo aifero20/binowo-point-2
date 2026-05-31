@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,7 +73,7 @@ function ShiftsPage() {
       const tunai = (sales ?? []).filter((s: any) => s.payment_method === "TUNAI").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const qris = (sales ?? []).filter((s: any) => s.payment_method === "QRIS").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
       const transfer = (sales ?? []).filter((s: any) => s.payment_method === "TRANSFER").reduce((a: number, s: any) => a + Number(s.grand_total), 0);
-      // Retur penjualan — kas keluar (kembalikan uang ke customer)
+      // Retur penjualan â€” kas keluar (kembalikan uang ke customer)
       const { data: salesReturns } = await supabase.from("sales_headers")
         .select("grand_total")
         .eq("transaction_status", "VOID")
@@ -133,7 +133,7 @@ function ShiftsPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Status Shift</CardTitle></CardHeader>
-          <CardContent><Badge variant={activeShift ? "default" : "secondary"} className="text-base px-3 py-1">{activeShift ? "SHIFT AKTIF" : "TIDAK ADA SHIFT"}</Badge></CardContent>
+          <CardContent><Badge variant={activeShift ? "default" : "secondary"} className="text-base px-3 py-1">{activeShift ? "SHIFT AKTIF" : "TIDAK ADA SHIFT"}</Badge>{activeShift && <p className="text-sm text-muted-foreground mt-1">Dibuka oleh: <span className="font-medium text-foreground">{activeShift.kasir_name ?? "-"}</span></p>}</CardContent>
         </Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Penjualan Tunai Shift Ini</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold text-green-600">{formatRp(shiftStats?.tunai ?? 0)}</p></CardContent>
@@ -146,7 +146,7 @@ function ShiftsPage() {
       <div className="flex gap-2 flex-wrap items-center justify-between">
         <div className="flex gap-2">
           {!activeShift && <Button onClick={() => setOpenShiftOpen(true)} className="gap-2"><Clock className="h-4 w-4" />Buka Shift</Button>}
-          {activeShift && <Button variant="destructive" onClick={() => setCloseShiftOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" />Tutup Shift</Button>}
+          {activeShift && activeShift.cashier_id === user?.id && <Button variant="destructive" onClick={() => setCloseShiftOpen(true)} className="gap-2"><DollarSign className="h-4 w-4" />Tutup Shift</Button>}{activeShift && activeShift.cashier_id !== user?.id && <p className="text-sm text-muted-foreground py-2">Shift dibuka oleh <span className="font-medium text-foreground">{activeShift.kasir_name}</span>. Hanya kasir tersebut yang dapat menutup shift.</p>}
         </div>
         <Button variant={isFiltered ? "default" : "outline"} className="gap-2" onClick={() => setShowFilter((v) => !v)}>
           <SlidersHorizontal className="h-4 w-4" />Filter{isFiltered ? " (aktif)" : ""}
@@ -235,7 +235,7 @@ function ShiftsPage() {
             <div className="flex justify-between text-red-500"><span>- Pembelian Tunai</span><span>{formatRp(shiftStats?.pembelianTunai ?? 0)}</span></div>
             <div className="flex justify-between font-bold border-t pt-2"><span>Expected Kas</span><span>{formatRp(expectedKas)}</span></div>
             <div className="pt-2 space-y-1.5">
-              <Label>Kas Aktual (Rp) — hitung fisik</Label>
+              <Label>Kas Aktual (Rp) â€” hitung fisik</Label>
               <Input type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} autoFocus />
             </div>
             {closingCash && (
