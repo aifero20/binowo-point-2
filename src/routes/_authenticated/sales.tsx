@@ -22,7 +22,7 @@ import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
-type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number; discountType?: "per_pcs" | "per_total" };
+type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number; discountType?: "per_pcs" | "per_total"; overStock?: boolean };
 
 function SalesPOS() {
   const { user } = useAuth();
@@ -41,8 +41,9 @@ function SalesPOS() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
   const [headerDiscount, setHeaderDiscount] = useState(0);
-
   const [activeTab, setActiveTab] = useState("pos");
+  const [activeCartIdx, setActiveCartIdx] = useState<number | null>(null);
+  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string; method: string } | null>(null);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -52,7 +53,6 @@ function SalesPOS() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -63,9 +63,7 @@ function SalesPOS() {
     syncPendingSales();
     return () => { window.removeEventListener("online", onOnline); window.removeEventListener("offline", onOffline); };
   }, []);
-  const [printData, setPrintData] = useState<{ no: string; items: CartLine[]; total: number; bayar: number; kembali: number; customerName: string; method: string } | null>(null);
 
-  const [activeCartIdx, setActiveCartIdx] = useState<number | null>(null);
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
     queryFn: async () => {
@@ -93,7 +91,21 @@ function SalesPOS() {
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
+  });
 
+  const { data: stockMap = {} } = useQuery({
+    queryKey: ["pos-stock", warehouseId],
+    queryFn: async () => {
+      if (!warehouseId) return {};
+      const { data } = await supabase.from("stock_movements").select("product_id, qty_in, qty_out").eq("warehouse_id", warehouseId);
+      const map: Record<string, number> = {};
+      for (const m of (data ?? []) as any[]) {
+        if (!map[m.product_id]) map[m.product_id] = 0;
+        map[m.product_id] += Number(m.qty_in) - Number(m.qty_out);
+      }
+      return map;
+    },
+    enabled: !!warehouseId,
   });
 
   const { data: customers = [] } = useQuery({
@@ -137,6 +149,7 @@ function SalesPOS() {
     },
     staleTime: 0,
   });
+
   const filteredSales = recentSales.filter((s: any) => {
     const cust = s.customers?.customer_name ?? "";
     const kasir = s.kasir_name ?? "";
@@ -154,7 +167,6 @@ function SalesPOS() {
     return (customers.find((c) => c.id === customerId) as Record<string, unknown>)?.customer_type as string ?? "RETAIL";
   }, [customerId, customers]);
 
-  // Re-apply diskon saat customer berubah
   useEffect(() => {
     setCart((c) => c.map((item) => {
       const discPct = productDiscountMap?.[item.product_id]?.[selectedCustomerType] ?? 0;
@@ -163,6 +175,7 @@ function SalesPOS() {
       return { ...item, discount: discPct, selling_price: newPrice };
     }));
   }, [selectedCustomerType, productDiscountMap]);
+
   const subtotalBeforeDiscount = useMemo(() => cart.reduce((s, l) => {
     const gross = l.qty * l.selling_price;
     const disc = l.discount ?? 0;
@@ -173,6 +186,7 @@ function SalesPOS() {
       return s + gross * (1 - disc / 100);
     }
   }, 0), [cart]);
+
   useEffect(() => {
     if (warehouses.length > 0 && !warehouseId) {
       const utama = warehouses.find((w) => w.warehouse_name.toLowerCase().includes("utama")) ?? warehouses[0];
@@ -193,14 +207,17 @@ function SalesPOS() {
       return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp }];
     });
   }
+
   const checkout = useMutation({
     mutationFn: async () => {
       if (cart.length === 0) throw new Error("Keranjang kosong");
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
+      if (cart.some((l) => l.overStock)) throw new Error("Ada item melebihi stok tersedia");
       const sales_number = "SO" + Date.now();
       const grossTotal = cart.reduce((s, l) => s + l.qty * l.selling_price, 0);
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal: grossTotal, grand_total: subtotal, discount: grossTotal - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
+      if (he) throw he;
       const sid = (header as { id: string }).id;
       await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
       await supabase.from("stock_movements").insert(cart.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "sale", reference_number: sales_number, qty_out: l.qty, created_by: user!.id })) as never);
@@ -210,17 +227,12 @@ function SalesPOS() {
     onSuccess: (data) => {
       toast.success(`Transaksi ${data.no} berhasil`);
       triggerSheetsSync("sales");
+      setPrintData(data);
       setCart([]);
       setPaymentAmount(0);
       setCustomerId("none");
       setHeaderDiscount(0);
       qc.invalidateQueries();
-      // Auto sync ke Google Sheets
-      fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ type: "sales" }),
-      }).catch(() => {});
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -244,7 +256,7 @@ function SalesPOS() {
       const { data: details } = await supabase.from("sales_details").select("product_id, qty, unit_name, selling_price, products(product_name)").eq("sales_id", id);
       const { error } = await supabase.from("sales_headers").update({ hold_status: false, deleted_at: new Date().toISOString() } as never).eq("id", id);
       if (error) throw error;
-      return (details ?? []).map((d: { product_id: string; qty: number; unit_name: string; selling_price: number; products: { product_name: string } | null }) => ({ product_id: d.product_id, product_name: d.products?.product_name ?? "-", unit_name: d.unit_name, qty: Number(d.qty), selling_price: Number(d.selling_price) }));
+      return (details ?? []).map((d: any) => ({ product_id: d.product_id, product_name: d.products?.product_name ?? "-", unit_name: d.unit_name, qty: Number(d.qty), selling_price: Number(d.selling_price) }));
     },
     onSuccess: (items) => { setCart(items); setActiveTab("pos"); toast.success("Transaksi dilanjutkan"); qc.invalidateQueries({ queryKey: ["held-sales"] }); qc.invalidateQueries({ queryKey: ["recent-sales"] }); },
     onError: (e: Error) => toast.error(e.message),
@@ -284,7 +296,7 @@ function SalesPOS() {
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
                             <Button size="sm" onClick={(e) => { e.stopPropagation(); addToCart(p, p.default_unit, selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price), 1); }}>+ {p.default_unit}</Button>
-                            {(p.product_units as { id: string; unit_name: string; conversion_qty: number; retail_price: number }[] ?? []).map((u) => (
+                            {(p.product_units as { id: string; unit_name: string; conversion_qty: number; retail_price: number; wholesale_price?: number }[] ?? []).map((u) => (
                               <Button key={u.id} size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); addToCart(p, u.unit_name, selectedCustomerType === "GROSIR" ? Number(u.wholesale_price ?? u.retail_price) : Number(u.retail_price), Number(u.conversion_qty)); }}>+ {u.unit_name}</Button>
                             ))}
                           </div>
@@ -297,7 +309,7 @@ function SalesPOS() {
             </Card>
 
             <Card className="h-fit sticky top-20">
-              <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">â— OFFLINE</span>}</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">OFFLINE</span>}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
@@ -322,28 +334,13 @@ function SalesPOS() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
                     <Label>Customer</Label>
-<div className="relative">
-                      <input
-                        type="text"
-                        className="w-full h-9 border rounded-md px-3 text-sm bg-background"
-                        placeholder="Umum / Walk-in"
-                        value={customerSearch}
-                        onChange={(e) => { setCustomerSearch(e.target.value); setCustomerOpen(true); }}
-                        onFocus={() => setCustomerOpen(true)}
-                        onBlur={() => setTimeout(() => setCustomerOpen(false), 150)}
-                      />
+                    <div className="relative">
+                      <input type="text" className="w-full h-9 border rounded-md px-3 text-sm bg-background" placeholder="Umum / Walk-in" value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); setCustomerOpen(true); }} onFocus={() => setCustomerOpen(true)} onBlur={() => setTimeout(() => setCustomerOpen(false), 150)} />
                       {customerOpen && (
                         <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-md max-h-[180px] overflow-y-auto">
-                          <div
-                            className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
-                            onMouseDown={() => { setCustomerId("none"); setCustomerSearch(""); setCustomerOpen(false); }}
-                          >Umum / Walk-in</div>
+                          <div className="px-3 py-2 text-sm cursor-pointer hover:bg-accent" onMouseDown={() => { setCustomerId("none"); setCustomerSearch(""); setCustomerOpen(false); }}>Umum / Walk-in</div>
                           {customers.filter((c) => c.customer_name.toLowerCase().includes(customerSearch.toLowerCase())).map((c) => (
-                            <div
-                              key={c.id}
-                              className="px-3 py-2 text-sm cursor-pointer hover:bg-accent"
-                              onMouseDown={() => { setCustomerId(c.id); setCustomerSearch(c.customer_name); setCustomerOpen(false); }}
-                            >{c.customer_name}</div>
+                            <div key={c.id} className="px-3 py-2 text-sm cursor-pointer hover:bg-accent" onMouseDown={() => { setCustomerId(c.id); setCustomerSearch(c.customer_name); setCustomerOpen(false); }}>{c.customer_name}</div>
                           ))}
                         </div>
                       )}
@@ -357,17 +354,23 @@ function SalesPOS() {
                 <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
                   {cart.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Keranjang kosong</p>}
                   {cart.map((l, i) => (
-                    <div key={i} className="p-2 flex gap-2 items-center text-sm">
+                    <div key={i} className="p-2 flex gap-2 items-start text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{l.product_name}</p>
                         <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} x {l.qty}</p>
                       </div>
-                      <Input type="number" min={1} value={l.qty} onChange={(e) => { setCart((c) => c.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) || 1 } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className="w-16 h-8" />
-                      <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value), selling_price: x.selling_price } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
+                      <div className="flex flex-col items-end gap-0.5">
+                        <Input type="number" min={1} value={l.qty} onChange={(e) => { const newQty = Number(e.target.value) || 1; const avail = (stockMap as any)[l.product_id] ?? 0; setCart((c) => c.map((x, j) => j === i ? { ...x, qty: newQty, overStock: avail > 0 && newQty > avail } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className={`w-16 h-8 ${l.overStock ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
+                        {l.overStock && <span className="text-red-500 text-xs whitespace-nowrap">Stok: {(stockMap as any)[l.product_id] ?? 0}</span>}
+                      </div>
+                      <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value) } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
                       <Button size="icon" variant="ghost" onClick={() => setCart((c) => c.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   ))}
                 </div>
+                {cart.some((l) => l.overStock) && (
+                  <p className="text-xs text-red-500 font-medium">Ada item melebihi stok tersedia. Kurangi jumlah sebelum bayar.</p>
+                )}
                 {headerDiscount > 0 && (
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Subtotal</span><span>{formatRp(subtotalBeforeDiscount)}</span>
@@ -404,7 +407,7 @@ function SalesPOS() {
                   <Button variant="outline" className="gap-1" disabled={holdTransaction.isPending || cart.length === 0} onClick={() => holdTransaction.mutate()}>
                     <PauseCircle className="h-4 w-4" />Hold
                   </Button>
-                  <Button size="lg" disabled={checkout.isPending || cart.length === 0} onClick={() => checkout.mutate()}>
+                  <Button size="lg" disabled={checkout.isPending || cart.length === 0 || cart.some((l) => l.overStock)} onClick={() => checkout.mutate()}>
                     {checkout.isPending ? "Memproses..." : "Bayar (F12)"}
                   </Button>
                 </div>
@@ -426,7 +429,7 @@ function SalesPOS() {
                     <TableCell className="text-sm">{(h as any).customers?.customer_name ?? <span className="text-muted-foreground text-xs">Umum</span>}</TableCell>
                     <TableCell className="text-xs max-w-[200px]">
                       {((h as any).sales_details ?? []).slice(0, 3).map((d: any, i: number) => (
-                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">Ã—{d.qty}</span></div>
+                        <div key={i} className="truncate">{d.products?.product_name} <span className="text-muted-foreground">x{d.qty}</span></div>
                       ))}
                       {((h as any).sales_details ?? []).length > 3 && <div className="text-muted-foreground">+{((h as any).sales_details ?? []).length - 3} lainnya</div>}
                     </TableCell>
@@ -478,7 +481,7 @@ function SalesPOS() {
               <Table>
                 <TableHeader><TableRow><TableHead>No. Transaksi</TableHead><TableHead>Waktu</TableHead><TableHead>Customer</TableHead><TableHead>Kasir</TableHead><TableHead>Metode</TableHead><TableHead>Ringkasan Produk</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="w-16" /></TableRow></TableHeader>
                 <TableBody>
-                  {pagedSales.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
+                  {pagedSales.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Belum ada transaksi.</TableCell></TableRow>}
                   {pagedSales.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-mono text-xs">{s.sales_number}</TableCell>
@@ -517,7 +520,6 @@ function SalesPOS() {
         </TabsContent>
       </Tabs>
 
-      {/* Void Confirmation */}
       <Dialog open={!!voidDialog} onOpenChange={(o) => { if (!o) setVoidDialog(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Konfirmasi Void Transaksi</DialogTitle></DialogHeader>
@@ -531,7 +533,6 @@ function SalesPOS() {
         </DialogContent>
       </Dialog>
 
-      {/* Print Receipt */}
       {printData && (
         <Dialog open={!!printData} onOpenChange={() => setPrintData(null)}>
           <DialogContent className="max-w-xs">
@@ -555,7 +556,7 @@ function SalesPOS() {
               ))}
               <div className="border-t border-dashed my-2" />
               <div className="flex justify-between font-bold"><span>TOTAL</span><span>{formatRp(printData.total)}</span></div>
-              <div className="flex justify-between"><span>Bayar <span className="text-muted-foreground text-xs">({printData.method})</span></span><span>{formatRp(printData.bayar)}</span></div>
+              <div className="flex justify-between"><span>Bayar ({printData.method})</span><span>{formatRp(printData.bayar)}</span></div>
               <div className="flex justify-between"><span>Kembali</span><span>{formatRp(printData.kembali)}</span></div>
               <div className="border-t border-dashed my-2" />
               <p className="text-center">Harga Sudah Termasuk PPN</p>
