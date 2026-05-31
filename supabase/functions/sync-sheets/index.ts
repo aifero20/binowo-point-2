@@ -205,7 +205,7 @@ serve(async (req) => {
             const qty = d ? Number(d.qty ?? 0) : 0;
             const satuan = d ? (d.unit_name ?? "-") : "-";
             const harga = d ? Number(d.buy_price ?? 0) : 0;
-            purchaseRows.push([idx === 0 ? p.purchase_number : "", idx === 0 ? (p.invoice_number ?? "-") : "", idx === 0 ? tgl : "", idx === 0 ? supplier : "", produk, qty, satuan, harga, qty * harga, idx === 0 ? p.grand_total : "", idx === 0 ? (p.payment_status ?? "-") : ""]);
+            purchaseRows.push([p.purchase_number, p.invoice_number ?? "-", tgl, supplier, produk, qty, satuan, harga, qty * harga, p.grand_total, p.payment_status ?? "-"]);
           });
         }
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Pembelian!A1?valueInputOption=RAW`, {
