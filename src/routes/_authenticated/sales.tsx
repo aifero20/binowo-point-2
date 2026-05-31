@@ -22,7 +22,7 @@ import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/sales")({ component: SalesPOS });
 
-type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; discount?: number; discountType?: "per_pcs" | "per_total"; overStock?: boolean };
+type CartLine = { product_id: string; product_name: string; unit_name: string; qty: number; selling_price: number; buy_price?: number; discount?: number; discountType?: "per_pcs" | "per_total"; overStock?: boolean };
 
 function SalesPOS() {
   const { user } = useAuth();
@@ -67,7 +67,7 @@ function SalesPOS() {
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_retail_price, current_wholesale_price, product_units(id, unit_name, conversion_qty, retail_price, wholesale_price)").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price, product_units(id, unit_name, conversion_qty, retail_price, wholesale_price)").is("deleted_at", null).limit(20);
       if (search) q = q.or(`product_name.ilike.%${search}%,product_code.ilike.%${search}%,barcode.ilike.%${search}%`);
       const { data, error } = await q;
       if (error) throw error;
@@ -204,7 +204,7 @@ function SalesPOS() {
       const existing = prev.find((l) => l.product_id === p.id && l.unit_name === unit);
       if (existing) { setActiveCartIdx(prev.indexOf(existing)); return prev.map((l) => l.product_id === p.id && l.unit_name === unit ? { ...l, qty: l.qty + 1 } : l); }
       setActiveCartIdx(prev.length);
-      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp }];
+      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: unit, qty: 1, selling_price: sp, buy_price: Number((p as any).current_buy_price ?? 0) }];
     });
   }
 
@@ -238,7 +238,7 @@ function SalesPOS() {
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal: grossTotal, grand_total: subtotal, discount: grossTotal - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
-      await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
+      await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, buy_price: l.buy_price ?? 0, total: l.qty * l.selling_price })) as never);
       await supabase.from("stock_movements").insert(cart.map((l) => ({ product_id: l.product_id, warehouse_id: warehouseId, transaction_type: "sale", reference_number: sales_number, qty_out: l.qty, created_by: user!.id })) as never);
       const custName = customers.find((c) => c.id === customerId)?.customer_name ?? "Umum / Walk-in";
       return { no: sales_number, items: [...cart], total: subtotal, bayar: paymentAmount, kembali: change, customerName: custName, method: paymentMethod };
@@ -264,7 +264,7 @@ function SalesPOS() {
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), cashier_id: user!.id, subtotal, grand_total: subtotal, payment_method: paymentMethod, transaction_status: "HOLD", hold_status: true } as never).select("id").single();
       if (he) throw he;
       const sid = (header as { id: string }).id;
-      await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, total: l.qty * l.selling_price })) as never);
+      await supabase.from("sales_details").insert(cart.map((l) => ({ sales_id: sid, product_id: l.product_id, warehouse_id: warehouseId, qty: l.qty, unit_name: l.unit_name, selling_price: l.selling_price, buy_price: l.buy_price ?? 0, total: l.qty * l.selling_price })) as never);
     },
     onSuccess: () => { toast.success("Transaksi di-hold"); setCart([]); setPaymentAmount(0); qc.invalidateQueries({ queryKey: ["held-sales"] }); qc.invalidateQueries({ queryKey: ["recent-sales"] }); },
     onError: (e: Error) => toast.error(e.message),
