@@ -231,7 +231,6 @@ function ShiftsPage() {
             <div className="flex justify-between text-blue-600"><span>Penjualan QRIS</span><span>{formatRp(shiftStats?.qris ?? 0)}</span></div>
             <div className="flex justify-between text-purple-600"><span>Penjualan Transfer</span><span>{formatRp(shiftStats?.transfer ?? 0)}</span></div>
             <div className="flex justify-between text-red-500"><span>- Retur Tunai</span><span>{formatRp(shiftStats?.returTunai ?? 0)}</span></div>
-            <div className="flex justify-between text-orange-500"><span>- Retur Penjualan</span><span>{formatRp(shiftStats?.returTunai ?? 0)}</span></div>
             <div className="flex justify-between text-red-500"><span>- Pembelian Tunai</span><span>{formatRp(shiftStats?.pembelianTunai ?? 0)}</span></div>
             <div className="flex justify-between font-bold border-t pt-2"><span>Expected Kas</span><span>{formatRp(expectedKas)}</span></div>
             <div className="pt-2 space-y-1.5">
