@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -197,7 +197,7 @@ function SalesPOS() {
   const subtotal = useMemo(() => subtotalBeforeDiscount * (1 - headerDiscount / 100), [subtotalBeforeDiscount, headerDiscount]);
   const change = paymentAmount - subtotal;
 
-  function addToCart(p: { id: string; product_name: string; default_unit: string; current_retail_price: number; current_wholesale_price?: number }, unitName?: string, price?: number, conv?: number) {
+  function addToCart(p: { id: string; product_name: string; default_unit: string; current_buy_price?: number; current_retail_price: number; current_wholesale_price?: number }, unitName?: string, price?: number, conv?: number) {
     const unit = unitName ?? p.default_unit;
     const sp = price ?? (selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price));
     setCart((prev) => {
