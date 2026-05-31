@@ -234,7 +234,7 @@ function ShiftsPage() {
             <div className="flex justify-between text-red-500"><span>- Pembelian Tunai</span><span>{formatRp(shiftStats?.pembelianTunai ?? 0)}</span></div>
             <div className="flex justify-between font-bold border-t pt-2"><span>Expected Kas</span><span>{formatRp(expectedKas)}</span></div>
             <div className="pt-2 space-y-1.5">
-              <Label>Kas Aktual (Rp) â€” hitung fisik</Label>
+              <Label>Kas Aktual (Rp) — hitung fisik</Label>
               <Input type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} autoFocus />
             </div>
             {closingCash && (
