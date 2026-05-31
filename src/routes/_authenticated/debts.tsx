@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,7 +30,7 @@ function DebtsPage() {
   const { data: debts = [] } = useQuery({
     queryKey: ["supplier-debts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("supplier_debts").select("id, debt_date, due_date, amount, paid_amount, remaining, status, suppliers(supplier_name), purchase_headers(purchase_number)").order("debt_date", { ascending: false });
+      const { data, error } = await supabase.from("supplier_debts").select("id, purchase_id, debt_date, due_date, amount, paid_amount, remaining, status, suppliers(supplier_name), purchase_headers(purchase_number)").order("debt_date", { ascending: false });
       if (error) throw error;
       return data as unknown as Debt[];
     },
@@ -59,8 +59,12 @@ function DebtsPage() {
       if (pe) throw pe;
       const { error: de } = await supabase.from("supplier_debts").update({ paid_amount: newPaid, remaining: newRemaining, status: newStatus } as never).eq("id", payDialog.id);
       if (de) throw de;
+      if (newStatus === "LUNAS") {
+        const purchaseId = (payDialog as any).purchase_id;
+        if (purchaseId) await supabase.from("purchase_headers").update({ payment_status: "LUNAS" } as never).eq("id", purchaseId);
+      }
     },
-    onSuccess: () => { toast.success("Pembayaran berhasil"); qc.invalidateQueries(); setPayDialog(null); setPayAmount(""); setPayNotes(""); },
+    onSuccess: () => { toast.success("Pembayaran berhasil"); qc.invalidateQueries(); setPayDialog(null); setPayAmount(""); setPayNotes(""); triggerSheetsSync("purchases"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -109,7 +113,7 @@ function DebtsPage() {
 
       <Dialog open={!!payDialog} onOpenChange={(o) => { if (!o) setPayDialog(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Bayar Hutang — {payDialog?.suppliers?.supplier_name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Bayar Hutang â€” {payDialog?.suppliers?.supplier_name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="flex justify-between text-sm"><span>Sisa Hutang</span><span className="font-bold text-red-500">{formatRp(payDialog?.remaining ?? 0)}</span></div>
             <div className="space-y-1.5"><Label>Jumlah Bayar</Label><Input type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} autoFocus /></div>
