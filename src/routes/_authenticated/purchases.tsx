@@ -83,6 +83,7 @@ function PurchasesPage() {
   const [editDueDate, setEditDueDate] = useState("");
   const [editSearch, setEditSearch] = useState("");
 
+  const [editPaymentLocked, setEditPaymentLocked] = useState(false);
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<PurchaseHeader | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -166,15 +167,15 @@ function PurchasesPage() {
     });
   }
 
-  function openEdit(h: PurchaseHeader) {
+  async function openEdit(h: PurchaseHeader) {
     setEditTarget(h);
     setEditSupplierId(h.supplier_id);
     setEditInvoiceNumber(h.invoice_number ?? "");
-    setEditPaymentStatus(h.payment_status ?? "LUNAS");
+    const { data: debtCheck } = await supabase.from("supplier_debts").select("status, paid_amount").eq("purchase_id", h.id).maybeSingle();
+    const isSettled = debtCheck && Number(debtCheck.paid_amount) > 0;
+    setEditPaymentStatus(isSettled && debtCheck.status === "LUNAS" ? "LUNAS" : (h.payment_status ?? "LUNAS"));
+    setEditPaymentLocked(!!isSettled);
     setEditDueDate("");
-    setEditSearch("");
-    const wh = h.purchase_details[0]?.warehouse_id ?? "";
-    setEditWarehouseId(wh || (warehouses.length > 0 ? (warehouses as any[])[0].id : ""));
     setEditLines(h.purchase_details.map((d) => ({
       product_id: d.product_id,
       product_name: d.products?.product_name ?? "-",
@@ -471,17 +472,18 @@ function PurchasesPage() {
               </div>
               <div className="space-y-1.5"><Label>No. Invoice</Label><Input value={editInvoiceNumber} onChange={(e) => setEditInvoiceNumber(e.target.value)} placeholder="Opsional" /></div>
               <div className="space-y-1.5"><Label>Status Pembayaran</Label>
-                <Select value={editPaymentStatus} onValueChange={setEditPaymentStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LUNAS">Lunas</SelectItem>
-                    <SelectItem value="HUTANG">Hutang</SelectItem>
-                  </SelectContent>
-                </Select>
+                {editPaymentLocked ? (
+                  <div className="h-9 px-3 flex items-center border rounded-md bg-muted text-sm text-muted-foreground">LUNAS <span className="ml-2 text-xs text-green-600">(sudah ada pembayaran)</span></div>
+                ) : (
+                  <Select value={editPaymentStatus} onValueChange={setEditPaymentStatus}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LUNAS">Lunas</SelectItem>
+                      <SelectItem value="HUTANG">Hutang</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
-              {editPaymentStatus === "HUTANG" && (
-                <div className="space-y-1.5"><Label>Jatuh Tempo</Label><Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} /></div>
-              )}
             </div>
             <div className="space-y-1.5">
               <Label>Cari Barang</Label>
