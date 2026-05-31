@@ -135,8 +135,8 @@ serve(async (req) => {
       const { data: sales, error: salesError } = await supabase
         .from("sales_headers")
         .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
-        .order("created_at", { ascending: false });
-      console.log("Sales fetched:", sales?.length ?? 0, "error:", JSON.stringify(salesError));
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
         rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
@@ -215,10 +215,12 @@ serve(async (req) => {
       }
     }
     if (type === "retur_pembelian" || type === "all") {
+      console.log("Starting retur_pembelian query");
       const { data: returPembelian } = await supabase
         .from("purchase_returns")
         .select("return_number, return_date, created_at, grand_total, suppliers(supplier_name), purchase_return_details(qty, unit_name, buy_price, products(product_name))")
         .order("created_at", { ascending: false });
+      console.log("returPembelian fetched:", returPembelian?.length ?? 0);
       if (returPembelian && returPembelian.length > 0) {
         const rpRows: unknown[][] = [];
         rpRows.push(["No. Retur","Tanggal","Jam","Supplier","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Grand Total"]);
