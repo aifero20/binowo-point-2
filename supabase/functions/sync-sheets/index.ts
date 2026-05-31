@@ -241,11 +241,12 @@ serve(async (req) => {
             rpRows.push([r.return_number, tgl, jam, supplier, produk, qty, satuan, harga, qty * harga, r.grand_total]);
           });
         }
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Retur%20Pembelian!A1?valueInputOption=RAW`, {
+        const rpRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Retur%20Pembelian!A1?valueInputOption=RAW`, {
           method: "PUT",
           headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ range: "Retur Pembelian!A1", majorDimension: "ROWS", values: rpRows }),
         });
+        const rpResult = await rpRes.json(); console.log("Retur Pembelian write:", JSON.stringify(rpResult));
       }
     }
     if (type === "retur_penjualan" || type === "all") {
