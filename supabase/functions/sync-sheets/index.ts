@@ -125,7 +125,6 @@ serve(async (req) => {
     try { body = await req.json(); } catch(e) { console.log("Body parse error:", e); }
     console.log("Body keys:", Object.keys(body).join(","));
     const type = isWebhook ? "sales" : ((body.type as string) ?? "all");
-    const type = isWebhook ? "sales" : ((body.type as string) ?? "sales");
 
     if (type === "sales" || type === "all") {
       const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
