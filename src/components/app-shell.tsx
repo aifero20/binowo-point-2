@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate, Outlet } from "@tanstack/react-router";
+﻿import { Link, useLocation, useNavigate, Outlet } from "@tanstack/react-router";
 import { OfflineIndicator } from "@/components/offline-indicator";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ const NAV = [
   { to: "/debts",           label: "Hutang Supplier",   icon: Banknote,        menu_code: "HUTANG_SUPPLIER" },
   { to: "/master-inventory",label: "Master Barang",     icon: Package2,        menu_code: "MASTER_BARANG" },
   { to: "/warehouses",      label: "Gudang",            icon: WarehouseIcon,   menu_code: "GUDANG" },
-  { to: "/reports",         label: "Laporan",           icon: BarChart2,       menu_code: "LAPORAN" },
+
   { to: "/users",           label: "Manajemen User",    icon: UserCog,         menu_code: "MANAJEMEN_USER" },
   { to: "/permissions",     label: "Permission Matrix", icon: ShieldCheck,     menu_code: "PERMISSION_MATRIX" },
 ] as const;
@@ -110,7 +110,7 @@ export function AppShell() {
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <div className="text-xs opacity-75">
             <p className="font-medium truncate">{user?.email}</p>
-            <p>{roleCode || "—"}</p>
+            <p>{roleCode || "â€”"}</p>
           </div>
           <Button variant="secondary" size="sm" className="w-full" onClick={handleSignOut}>
             <LogOut className="h-4 w-4 mr-2" />

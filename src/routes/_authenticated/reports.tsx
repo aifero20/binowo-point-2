@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,7 @@ import { formatRp } from "@/lib/format";
 import { toast } from "sonner";
 import { supabase as sb } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/_authenticated/reports")({ component: ReportsPage });
+export const Route = createFileRoute("/_authenticated/reports")({ beforeLoad: () => { throw redirect({ to: "/dashboard" }); }, component: ReportsPage });
 
 function ReportsPage() {
   const today = new Date().toISOString().split("T")[0];
@@ -87,7 +87,7 @@ function ReportsPage() {
         <div className="space-y-1.5"><Label>Dari Tanggal</Label><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></div>
         <div className="space-y-1.5"><Label>Sampai Tanggal</Label><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></div>
         <Button variant="outline" onClick={syncToSheets} disabled={syncing} className="gap-2">
-          {syncing ? "Syncing..." : "☁ Sync ke Google Sheets"}
+          {syncing ? "Syncing..." : "â˜ Sync ke Google Sheets"}
         </Button>
       </div>
 

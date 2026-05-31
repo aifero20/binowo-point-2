@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { TrendingUp, ShoppingCart, Package, AlertTriangle } from "lucide-react";
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { formatRp } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
@@ -41,6 +42,25 @@ const PRESETS = [
 
 function DashboardPage() {
   const today = new Date().toISOString().split("T")[0];
+  const [syncing, setSyncing] = useState(false);
+  async function syncToSheets() {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("https://bapgptjffhufykvoxtnq.supabase.co/functions/v1/sync-sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ type: "all" }),
+      });
+      const result = await res.json();
+      if (result.success) toast.success("Berhasil sync ke Google Sheets!");
+      else toast.error("Sync gagal: " + JSON.stringify(result));
+    } catch (e) {
+      toast.error("Sync error: " + String(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
   const [activePreset, setActivePreset] = useState("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -150,6 +170,14 @@ function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Data penjualan & operasional</p>
+        <Button variant="outline" size="sm" className="gap-2" onClick={syncToSheets} disabled={syncing}>
+          <RefreshCw className={["h-4 w-4", syncing ? "animate-spin" : ""].join(" ")} />
+          {syncing ? "Syncing..." : "Sync Google Sheets"}
+        </Button>
+      </div>
       {/* Filter Preset */}
       <Card className="border-dashed">
         <CardContent className="pt-4 pb-3 space-y-3">
