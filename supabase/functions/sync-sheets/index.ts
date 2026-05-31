@@ -215,6 +215,77 @@ serve(async (req) => {
         });
       }
     }
+    if (type === "retur_pembelian" || type === "all") {
+      const { data: returPembelian } = await supabase
+        .from("purchase_returns")
+        .select("return_number, return_date, created_at, grand_total, suppliers(supplier_name), purchase_return_details(qty, unit_name, buy_price, products(product_name))")
+        .order("created_at", { ascending: false });
+      if (returPembelian && returPembelian.length > 0) {
+        const rpRows: unknown[][] = [];
+        rpRows.push(["No. Retur","Tanggal","Jam","Supplier","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Grand Total"]);
+        for (const r of returPembelian as Record<string, unknown>[]) {
+          const dt = new Date((r.return_date ?? r.created_at) as string);
+          const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
+          const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
+          const jam = wib.toISOString().split("T")[1].substring(0, 8);
+          const supplier = (r.suppliers as Record<string,unknown>)?.supplier_name ?? "-";
+          const details = (r.purchase_return_details as Record<string,unknown>[]) ?? [];
+          const itemList = details.length > 0 ? details : [null];
+          itemList.forEach((d) => {
+            const produk = d ? ((d.products as Record<string,unknown>)?.product_name ?? "-") : "-";
+            const qty = d ? Number(d.qty ?? 0) : 0;
+            const satuan = d ? (d.unit_name ?? "-") : "-";
+            const harga = d ? Number(d.buy_price ?? 0) : 0;
+            rpRows.push([r.return_number, tgl, jam, supplier, produk, qty, satuan, harga, qty * harga, r.grand_total]);
+          });
+        }
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Retur%20Pembelian!A1?valueInputOption=RAW`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ range: "Retur Pembelian!A1", majorDimension: "ROWS", values: rpRows }),
+        });
+      }
+    }
+    if (type === "retur_penjualan" || type === "all") {
+      const { data: usersData2 } = await supabase.from("users").select("id, full_name").is("deleted_at", null);
+      const userMap2: Record<string, string> = {};
+      (usersData2 ?? []).forEach((u: Record<string, unknown>) => { userMap2[u.id as string] = u.full_name as string; });
+      const { data: returPenjualan } = await supabase
+        .from("sales_headers")
+        .select("sales_number, created_at, grand_total, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, discount, product:product_id(product_name))")
+        .eq("transaction_status", "VOID")
+        .eq("payment_method", "RETUR")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+      if (returPenjualan && returPenjualan.length > 0) {
+        const rsRows: unknown[][] = [];
+        rsRows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon (%)","Grand Total"]);
+        for (const r of returPenjualan as Record<string, unknown>[]) {
+          const dt = new Date(r.created_at as string);
+          const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
+          const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
+          const jam = wib.toISOString().split("T")[1].substring(0, 8);
+          const kasir = userMap2[r.cashier_id as string] ?? "-";
+          const customer = (r.customer as Record<string,unknown>)?.customer_name ?? "Umum/Walk-in";
+          const details = (r.sales_details as Record<string,unknown>[]) ?? [];
+          const grandTotal = Number(r.grand_total ?? 0);
+          const itemList = details.length > 0 ? details : [null];
+          itemList.forEach((d) => {
+            const produk = d ? ((d.product as Record<string,unknown>)?.product_name ?? "-") : "-";
+            const qty = d ? Number(d.qty ?? 0) : 0;
+            const satuan = d ? (d.unit_name ?? "-") : "-";
+            const harga = d ? Number(d.selling_price ?? 0) : 0;
+            const disc = d ? Number(d.discount ?? 0) : 0;
+            rsRows.push([r.sales_number, tgl, jam, kasir, customer, produk, qty, satuan, harga, qty * harga, disc, grandTotal]);
+          });
+        }
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Retur%20Penjualan!A1?valueInputOption=RAW`, {
+          method: "PUT",
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ range: "Retur Penjualan!A1", majorDimension: "ROWS", values: rsRows }),
+        });
+      }
+    }
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
