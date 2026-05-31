@@ -194,7 +194,7 @@ serve(async (req) => {
         const purchaseRows: unknown[][] = [];
         purchaseRows.push(["No. PO","No. Invoice","Tanggal","Jam","Supplier","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Grand Total","Status Bayar"]);
         for (const p of purchases as Record<string, unknown>[]) {
-          const dt = new Date((p.transaction_date ?? p.created_at) as string);
+          const dt = new Date(p.created_at as string);
           const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
           const tgl = wib.toISOString().split("T")[0].split("-").reverse().join("/");
           const jam = wib.toISOString().split("T")[1].substring(0, 8);
