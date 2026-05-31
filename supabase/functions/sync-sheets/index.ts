@@ -47,7 +47,7 @@ async function getGoogleTokenDirect(clientEmail: string, privateKeyPem: string):
     body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
   });
   const tokenData = await tokenRes.json();
-  console.log("Token exchange:", JSON.stringify(tokenData));
+  // token exchange logged removed
   return tokenData.access_token;
 }
 
@@ -86,7 +86,7 @@ async function getGoogleToken(serviceAccountB64: string): Promise<string> {
     body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
   });
   const tokenData = await tokenRes.json();
-  console.log("Token exchange:", JSON.stringify(tokenData));
+  // token exchange logged removed
   return tokenData.access_token;
 }
 
@@ -125,6 +125,7 @@ serve(async (req) => {
     try { body = await req.json(); } catch(e) { console.log("Body parse error:", e); }
     const isWebhook = !!body.record;
     const type = isWebhook ? "sales" : ((body.type as string) ?? "all");
+    console.log("Type received:", type);
 
     if (type === "sales" || type === "all") {
       const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
