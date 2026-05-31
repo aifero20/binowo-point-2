@@ -46,9 +46,10 @@ function DashboardPage() {
   async function syncToSheets() {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-sheets", { body: { type: "all" } });
-      if (error) toast.error("Sync gagal: " + error.message);
-      else toast.success("Berhasil sync ke Google Sheets!");
+      for (const t of ["sales", "purchases", "retur_pembelian", "retur_penjualan"]) {
+        await supabase.functions.invoke("sync-sheets", { body: { type: t } });
+      }
+      toast.success("Berhasil sync ke Google Sheets!");
     } catch (e) {
       toast.error("Sync error: " + String(e));
     } finally {
