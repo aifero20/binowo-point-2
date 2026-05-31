@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 export const Route = createFileRoute("/_authenticated/permissions")({ component: PermissionsPage });
 
 const ROLES = ["OWNER", "ADMIN", "SUPERVISOR", "KASIR"];
-const MENU_ORDER = ["DASHBOARD","SHIFT_KASIR","PENJUALAN","CUSTOMER","RETUR","PEMBELIAN","SUPPLIER","HUTANG_SUPPLIER","MASTER_BARANG","GUDANG","LAPORAN","MANAJEMEN_USER","PERMISSION_MATRIX"];
+const MENU_ORDER = ["DASHBOARD","SHIFT_KASIR","PENJUALAN","CUSTOMER","RETUR","PEMBELIAN","SUPPLIER","HUTANG_SUPPLIER","MASTER_BARANG","GUDANG","MANAJEMEN_USER","PERMISSION_MATRIX"];
 
 type Permission = { id: string; menu_code: string; menu_name: string };
 type RolePermission = { id: string; role_code: string; permission_id: string; is_active: boolean };
