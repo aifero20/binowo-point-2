@@ -135,12 +135,12 @@ serve(async (req) => {
       (usersData ?? []).forEach((u: Record<string, unknown>) => { userMap[u.id as string] = u.full_name as string; });
       const { data: sales, error: salesError } = await supabase
         .from("sales_headers")
-        .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, product:product_id(product_name))`)
+        .select(`sales_number, transaction_date, created_at, subtotal, discount, grand_total, payment_method, payment_amount, change_amount, transaction_status, cashier_id, customer:customer_id(customer_name), sales_details(qty, unit_name, selling_price, buy_price, product:product_id(product_name))`)
         .order("created_at", { ascending: false })
         .limit(500);
       if (sales && sales.length > 0) {
         const rows: unknown[][] = [];
-        rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
+        rows.push(["No. Transaksi","Tanggal","Jam","Kasir","Customer","Nama Produk","Qty","Satuan","Harga Beli","Harga Satuan","Total Item","Diskon Header (%)","Grand Total","Metode Bayar","Dibayar","Kembalian","Status"]);
         for (const s of sales as Record<string, unknown>[]) {
           const dt = new Date((s.transaction_date ?? s.created_at) as string);
           const wib = new Date(dt.getTime() + 7 * 60 * 60 * 1000);
@@ -156,7 +156,7 @@ serve(async (req) => {
           itemList.forEach((d, idx) => {
             const produk = d ? ((d.product as Record<string,unknown>)?.product_name ?? "-") : "-";
             const harga = d ? Number(d.selling_price ?? 0) : 0;
-            const qty = d ? Number(d.qty ?? 0) : 0;
+            const buyPrice = d ? Number(d.buy_price ?? 0) : 0;
             const satuan = d ? (d.unit_name ?? "-") : "-";
             rows.push([
               s.sales_number,
@@ -164,7 +164,7 @@ serve(async (req) => {
               jam,
               kasir,
               customer,
-              produk, qty, satuan, harga, harga*qty,
+              produk, qty, satuan, buyPrice, harga, harga*qty,
               discPct,
               grandTotal,
               s.payment_method,
