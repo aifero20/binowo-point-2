@@ -214,6 +214,25 @@ function SalesPOS() {
       if (!warehouseId) throw new Error("Pilih gudang");
       if (paymentMethod === "TUNAI" && paymentAmount < subtotal) throw new Error("Pembayaran kurang");
       if (cart.some((l) => l.overStock)) throw new Error("Ada item melebihi stok tersedia");
+      // Validasi stok realtime sebelum transaksi
+      const { data: freshMovements } = await supabase
+        .from("stock_movements")
+        .select("product_id, qty_in, qty_out")
+        .eq("warehouse_id", warehouseId)
+        .in("product_id", cart.map((l) => l.product_id));
+      const freshStock: Record<string, number> = {};
+      for (const m of (freshMovements ?? []) as any[]) {
+        if (!freshStock[m.product_id]) freshStock[m.product_id] = 0;
+        freshStock[m.product_id] += Number(m.qty_in) - Number(m.qty_out);
+      }
+      const overStockItems = cart.filter((l) => {
+        const avail = freshStock[l.product_id] ?? 0;
+        return l.qty > avail;
+      });
+      if (overStockItems.length > 0) {
+        const names = overStockItems.map((l) => `${l.product_name} (stok: ${freshStock[l.product_id] ?? 0})`).join(", ");
+        throw new Error(`Stok tidak cukup: ${names}`);
+      }
       const sales_number = "SO" + Date.now();
       const grossTotal = cart.reduce((s, l) => s + l.qty * l.selling_price, 0);
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal: grossTotal, grand_total: subtotal, discount: grossTotal - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
@@ -360,7 +379,7 @@ function SalesPOS() {
                         <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} x {l.qty}</p>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
-                        <Input type="number" min={1} value={l.qty} onChange={(e) => { const newQty = Number(e.target.value) || 1; const avail = (stockMap as any)[l.product_id] ?? 0; setCart((c) => c.map((x, j) => j === i ? { ...x, qty: newQty, overStock: avail > 0 && newQty > avail } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className={`w-16 h-8 ${l.overStock ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
+                        <Input type="number" min={1} value={l.qty} onChange={(e) => { const newQty = Number(e.target.value) || 1; const avail = (stockMap as any)[l.product_id] ?? 0; setCart((c) => c.map((x, j) => j === i ? { ...x, qty: newQty, overStock: newQty > avail && avail >= 0 } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className={`w-16 h-8 ${l.overStock ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
                         {l.overStock && <span className="text-red-500 text-xs whitespace-nowrap">Stok: {(stockMap as any)[l.product_id] ?? 0}</span>}
                       </div>
                       <Input type="number" min={0} max={100} value={l.discount ?? 0} onChange={(e) => setCart((c) => c.map((x, j) => j === i ? { ...x, discount: Number(e.target.value) } : x))} className="w-14 h-8" placeholder="%" title="Diskon %" />
