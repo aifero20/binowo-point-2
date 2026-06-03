@@ -427,7 +427,7 @@ function SalesPOS() {
                     <PauseCircle className="h-4 w-4" />Hold
                   </Button>
                   <Button size="lg" disabled={checkout.isPending || cart.length === 0 || cart.some((l) => l.overStock)} onClick={() => checkout.mutate()}>
-                    {checkout.isPending ? "Memproses..." : "Bayar (F12)"}
+                    {checkout.isPending ? "Memproses..." : "Bayar"}
                   </Button>
                 </div>
               </CardContent>
