@@ -157,6 +157,7 @@ serve(async (req) => {
             const produk = d ? ((d.product as Record<string,unknown>)?.product_name ?? "-") : "-";
             const harga = d ? Number(d.selling_price ?? 0) : 0;
             const buyPrice = d ? Number(d.buy_price ?? 0) : 0;
+            const qty = d ? Number(d.qty ?? 0) : 0;
             const satuan = d ? (d.unit_name ?? "-") : "-";
             rows.push([
               s.sales_number,
