@@ -116,7 +116,7 @@ function SalesPOS() {
   const { data: heldTransactions = [] } = useQuery({
     queryKey: ["held-sales"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, created_at, customers(customer_name), sales_details(qty, unit_name, products(product_name))").eq("hold_status", true).is("deleted_at", null).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("sales_headers").select("id, sales_number, grand_total, created_at, customers(customer_name), sales_details(qty, unit_name, products(product_name))").eq("transaction_status", "HOLD").is("deleted_at", null).order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
