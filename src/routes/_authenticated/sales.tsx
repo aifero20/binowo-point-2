@@ -273,7 +273,7 @@ function SalesPOS() {
   const resumeHold = useMutation({
     mutationFn: async (id: string) => {
       const { data: details } = await supabase.from("sales_details").select("product_id, qty, unit_name, selling_price, products(product_name)").eq("sales_id", id);
-      const { error } = await supabase.from("sales_headers").update({ hold_status: false } as never).eq("id", id);
+      const { error } = await supabase.from("sales_headers").update({ hold_status: false, deleted_at: new Date().toISOString() } as never).eq("id", id);
       if (error) throw error;
       return (details ?? []).map((d: any) => ({ product_id: d.product_id, product_name: d.products?.product_name ?? "-", unit_name: d.unit_name, qty: Number(d.qty), selling_price: Number(d.selling_price) }));
     },
