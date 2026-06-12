@@ -8,7 +8,6 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { useRegisterSW } from "virtual:pwa-register/react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -76,7 +75,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "manifest", href: "/manifest.json" },
       { rel: "apple-touch-icon", href: "/icon-192.png" },
     ],
     meta: [
@@ -116,17 +115,27 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
 
-  // Auto-update PWA: ketika ada versi baru, langsung reload
-  useRegisterSW({
-    onRegisteredSW(_swUrl, r) {
-      // Cek update setiap 60 menit
-      r && setInterval(() => r.update(), 60 * 60 * 1000);
-    },
-    onNeedRefresh() {
-      // SW baru tersedia, langsung claim tanpa tanya user
-      window.location.reload();
-    },
-  });
+  // Register Service Worker manual
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        // Cek update setiap 60 menit
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+        // Kalau ada SW baru waiting, langsung aktifkan
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                newWorker.postMessage({ type: "SKIP_WAITING" });
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
