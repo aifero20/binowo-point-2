@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -73,23 +74,22 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icon-192.png" },
+    ],
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Binowo - Kasir Toko Grosir" },
+      { title: "Binowo Perkasa" },
       { name: "description", content: "Binowo PWA Kasir untuk toko grosir rokok - cepat, akurat, multi gudang." },
       { name: "author", content: "Binowo" },
-      { property: "og:title", content: "Binowo - Kasir Toko Grosir" },
-      { property: "og:description", content: "PWA kasir multi gudang dengan stok akurat & cetak thermal." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { name: "theme-color", content: "#2563eb" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Binowo Perkasa" },
     ],
   }),
   shellComponent: RootShell,
@@ -115,6 +115,18 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+
+  // Auto-update PWA: ketika ada versi baru, langsung reload
+  useRegisterSW({
+    onRegisteredSW(_swUrl, r) {
+      // Cek update setiap 60 menit
+      r && setInterval(() => r.update(), 60 * 60 * 1000);
+    },
+    onNeedRefresh() {
+      // SW baru tersedia, langsung claim tanpa tanya user
+      window.location.reload();
+    },
+  });
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
