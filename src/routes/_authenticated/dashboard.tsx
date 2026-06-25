@@ -115,7 +115,7 @@ function DashboardPage() {
   const { data: lowStockProducts = [] } = useQuery({
     queryKey: ["dash-low-stock"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id, product_code, product_name, minimum_stock, default_unit").is("deleted_at", null).eq("is_active", true).gt("minimum_stock", 0).limit(50);
+      const { data } = await supabase.from("products").select("id, product_code, product_name, minimum_stock, default_unit, supplier:supplier_id(supplier_name)").is("deleted_at", null).eq("is_active", true).gt("minimum_stock", 0).limit(50);
       if (!data || data.length === 0) return [];
       const { data: movements } = await supabase.from("stock_movements").select("product_id, qty_in, qty_out");
       const stockMap: Record<string, number> = {};
@@ -124,7 +124,15 @@ function DashboardPage() {
         stockMap[m.product_id] += Number(m.qty_in) - Number(m.qty_out);
       }
       return data.filter((p: any) => (stockMap[p.id] ?? 0) <= p.minimum_stock)
-        .map((p: any) => ({ ...p, current_stock: stockMap[p.id] ?? 0 }))
+        .map((p: any) => {
+          const current_stock = stockMap[p.id] ?? 0;
+          return {
+            ...p,
+            current_stock,
+            supplier_name: p.supplier?.supplier_name ?? "-",
+            qty_needed: Math.max(0, p.minimum_stock - current_stock),
+          };
+        })
         .sort((a: any, b: any) => a.current_stock - b.current_stock);
     },
   });
@@ -292,14 +300,16 @@ function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama Barang</TableHead><TableHead className="text-right">Stok Saat Ini</TableHead><TableHead className="text-right">Min. Stok</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama Barang</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Stok Saat Ini</TableHead><TableHead className="text-right">Min. Stok</TableHead><TableHead className="text-right">Kekurangan Stok</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
                 {lowStockProducts.map((p: any) => (
                   <TableRow key={p.id} className="bg-orange-50/50">
                     <TableCell className="font-mono text-xs">{p.product_code}</TableCell>
                     <TableCell className="font-medium">{p.product_name}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{p.supplier_name}</TableCell>
                     <TableCell className="text-right font-bold text-orange-600">{p.current_stock} {p.default_unit}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{p.minimum_stock} {p.default_unit}</TableCell>
+                    <TableCell className="text-right font-semibold text-orange-600">{p.qty_needed} {p.default_unit}</TableCell>
                     <TableCell><Badge variant="outline" className="border-orange-400 text-orange-600 text-xs">{p.current_stock <= 0 ? "HABIS" : "MENIPIS"}</Badge></TableCell>
                   </TableRow>
                 ))}
