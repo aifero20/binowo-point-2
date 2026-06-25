@@ -114,6 +114,57 @@ function PurchasesPage() {
     queryFn: async () => { const { data } = await supabase.from("suppliers").select("id, supplier_name").is("deleted_at", null).order("supplier_name"); return data ?? []; },
   });
 
+  // Relasi produk <-> supplier (dari Master Barang), dipakai untuk filter dua arah di form Pembelian & Edit
+  const { data: productSupplierLinks = [] } = useQuery({
+    queryKey: ["product-suppliers-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_suppliers").select("product_id, supplier_id");
+      return data ?? [];
+    },
+  });
+
+  // product_id -> Set<supplier_id>
+  const productToSuppliers = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const row of productSupplierLinks as any[]) {
+      if (!map[row.product_id]) map[row.product_id] = new Set();
+      map[row.product_id].add(row.supplier_id);
+    }
+    return map;
+  }, [productSupplierLinks]);
+
+  // supplier_id -> Set<product_id>
+  const supplierToProducts = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const row of productSupplierLinks as any[]) {
+      if (!map[row.supplier_id]) map[row.supplier_id] = new Set();
+      map[row.supplier_id].add(row.product_id);
+    }
+    return map;
+  }, [productSupplierLinks]);
+
+  // Supplier mana saja yang menyediakan SEMUA produk yang sudah ada di daftar lines (form Buat Pembelian)
+  const eligibleSupplierIdsForLines = useMemo(() => {
+    if (lines.length === 0) return null; // null = belum ada batasan, semua supplier boleh
+    let result: Set<string> | null = null;
+    for (const l of lines) {
+      const sups = productToSuppliers[l.product_id] ?? new Set<string>();
+      result = result === null ? new Set(sups) : new Set([...result].filter((id) => sups.has(id)));
+    }
+    return result ?? new Set<string>();
+  }, [lines, productToSuppliers]);
+
+  // Supplier mana saja yang menyediakan SEMUA produk di editLines (form Edit Pembelian)
+  const eligibleSupplierIdsForEditLines = useMemo(() => {
+    if (editLines.length === 0) return null;
+    let result: Set<string> | null = null;
+    for (const l of editLines) {
+      const sups = productToSuppliers[l.product_id] ?? new Set<string>();
+      result = result === null ? new Set(sups) : new Set([...result].filter((id) => sups.has(id)));
+    }
+    return result ?? new Set<string>();
+  }, [editLines, productToSuppliers]);
+
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
@@ -126,10 +177,10 @@ function PurchasesPage() {
     }
   }, [warehouses]);
 
-  const { data: products = [] } = useQuery({
+  const { data: rawProducts = [] } = useQuery({
     queryKey: ["pos-products", searchProduct],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price").is("deleted_at", null).limit(50);
       if (searchProduct) q = q.or(`product_name.ilike.%${searchProduct}%,product_code.ilike.%${searchProduct}%`);
       const { data, error } = await q;
       if (error) throw error;
@@ -137,16 +188,30 @@ function PurchasesPage() {
     },
   });
 
-  const { data: editProducts = [] } = useQuery({
+  // Kalau supplier sudah dipilih, hanya tampilkan barang yang disediakan supplier tersebut
+  const products = useMemo(() => {
+    if (!supplierId) return rawProducts;
+    const allowed = supplierToProducts[supplierId] ?? new Set<string>();
+    return (rawProducts as any[]).filter((p) => allowed.has(p.id));
+  }, [rawProducts, supplierId, supplierToProducts]);
+
+  const { data: rawEditProducts = [] } = useQuery({
     queryKey: ["pos-products-edit", editSearch],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price").is("deleted_at", null).limit(50);
       if (editSearch) q = q.or(`product_name.ilike.%${editSearch}%,product_code.ilike.%${editSearch}%`);
       const { data } = await q;
       return data ?? [];
     },
     enabled: editOpen,
   });
+
+  // Kalau supplier sudah dipilih di form Edit, hanya tampilkan barang yang disediakan supplier tersebut
+  const editProducts = useMemo(() => {
+    if (!editSupplierId) return rawEditProducts;
+    const allowed = supplierToProducts[editSupplierId] ?? new Set<string>();
+    return (rawEditProducts as any[]).filter((p) => allowed.has(p.id));
+  }, [rawEditProducts, editSupplierId, supplierToProducts]);
 
   const grandTotal = useMemo(() => lines.reduce((s, l) => s + l.qty * l.buy_price, 0), [lines]);
   const editGrandTotal = useMemo(() => editLines.reduce((s, l) => s + l.qty * l.buy_price, 0), [editLines]);
@@ -342,8 +407,15 @@ function PurchasesPage() {
                   <div className="space-y-1.5"><Label>Supplier *</Label>
                     <Select value={supplierId} onValueChange={setSupplierId}>
                       <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-                      <SelectContent>{(suppliers as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        {(suppliers as any[])
+                          .filter((s: any) => eligibleSupplierIdsForLines === null || eligibleSupplierIdsForLines.has(s.id))
+                          .map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}
+                      </SelectContent>
                     </Select>
+                    {eligibleSupplierIdsForLines !== null && eligibleSupplierIdsForLines.size === 0 && (
+                      <p className="text-xs text-destructive">Barang yang sudah dipilih tidak memiliki satu supplier yang sama. Hapus salah satu barang, atau pilih barang dari supplier yang sama.</p>
+                    )}
                   </div>
                   <div className="space-y-1.5"><Label>Gudang *</Label>
                     <Select value={warehouseId} onValueChange={setWarehouseId}>
@@ -461,8 +533,15 @@ function PurchasesPage() {
               <div className="space-y-1.5"><Label>Supplier *</Label>
                 <Select value={editSupplierId} onValueChange={setEditSupplierId}>
                   <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-                  <SelectContent>{(suppliers as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {(suppliers as any[])
+                      .filter((s: any) => eligibleSupplierIdsForEditLines === null || eligibleSupplierIdsForEditLines.has(s.id))
+                      .map((s: any) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}
+                  </SelectContent>
                 </Select>
+                {eligibleSupplierIdsForEditLines !== null && eligibleSupplierIdsForEditLines.size === 0 && (
+                  <p className="text-xs text-destructive">Barang yang sudah dipilih tidak memiliki satu supplier yang sama. Hapus salah satu barang, atau pilih barang dari supplier yang sama.</p>
+                )}
               </div>
               <div className="space-y-1.5"><Label>Gudang *</Label>
                 <Select value={editWarehouseId} onValueChange={setEditWarehouseId}>
