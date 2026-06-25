@@ -44,12 +44,24 @@ function ProductsPage() {
   });
 
   const save = useMutation({
-    mutationFn: async (form: Partial<Product>) => {
-      const op = editing ? supabase.from("products").update(form).eq("id", editing.id) : supabase.from("products").insert(form as never);
-      const { error } = await op;
-      if (error) throw error;
+    mutationFn: async ({ form, supplierIds }: { form: Partial<Product>; supplierIds: string[] }) => {
+      let productId: string;
+      if (editing) {
+        const { error } = await supabase.from("products").update(form).eq("id", editing.id);
+        if (error) throw error;
+        productId = editing.id;
+      } else {
+        const { data, error } = await supabase.from("products").insert(form as never).select("id").single();
+        if (error) throw error;
+        productId = (data as { id: string }).id;
+      }
+      await supabase.from("product_suppliers").delete().eq("product_id", productId);
+      if (supplierIds.length > 0) {
+        const { error: pse } = await supabase.from("product_suppliers").insert(supplierIds.map((sid) => ({ product_id: productId, supplier_id: sid })) as never);
+        if (pse) throw pse;
+      }
     },
-    onSuccess: () => { toast.success("Barang disimpan"); qc.invalidateQueries({ queryKey: ["products"] }); setOpen(false); setEditing(null); },
+    onSuccess: () => { toast.success("Barang disimpan"); qc.invalidateQueries({ queryKey: ["products"] }); qc.invalidateQueries({ queryKey: ["product-suppliers-form"] }); setOpen(false); setEditing(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -120,7 +132,7 @@ function ProductsPage() {
         <Input placeholder="Cari barang / barcode..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
           <DialogTrigger asChild><Button size="lg"><Plus className="h-4 w-4 mr-1" /> Tambah Barang</Button></DialogTrigger>
-          <ProductForm editing={editing} suppliers={suppliers} onSubmit={(f) => save.mutate(f)} loading={save.isPending} />
+          <ProductForm editing={editing} suppliers={suppliers} onSubmit={(f, supplierIds) => save.mutate({ form: f, supplierIds })} loading={save.isPending} />
         </Dialog>
       </div>
       <Card><CardContent className="p-0">
@@ -206,14 +218,30 @@ function ProductsPage() {
   );
 }
 
-function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Product | null; suppliers: { id: string; supplier_name: string }[]; onSubmit: (f: Partial<Product>) => void; loading: boolean }) {
+function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Product | null; suppliers: { id: string; supplier_name: string }[]; onSubmit: (f: Partial<Product>, supplierIds: string[]) => void; loading: boolean }) {
   const [form, setForm] = useState<Partial<Product>>(editing ?? { product_code: "", product_name: "", barcode: "", default_unit: "PCS", current_buy_price: 0, current_retail_price: 0, current_wholesale_price: 0, minimum_stock: 0, supplier_id: null });
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
   React.useEffect(() => { setForm(editing ?? {}); }, [editing]);
+
+  const { data: existingSupplierIds } = useQuery({
+    queryKey: ["product-suppliers-form", editing?.id],
+    queryFn: async () => {
+      if (!editing) return [];
+      const { data } = await supabase.from("product_suppliers").select("supplier_id").eq("product_id", editing.id);
+      return (data ?? []).map((d: any) => d.supplier_id as string);
+    },
+    enabled: !!editing,
+  });
+
+  React.useEffect(() => {
+    setSelectedSupplierIds(editing ? (existingSupplierIds ?? []) : []);
+  }, [editing, existingSupplierIds]);
+
   const n = (v: string) => Number(v) || 0;
   return (
     <DialogContent className="max-w-lg">
       <DialogHeader><DialogTitle>{editing ? "Edit Barang" : "Tambah Barang"}</DialogTitle></DialogHeader>
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
+      <form onSubmit={(e) => { e.preventDefault(); onSubmit(form, selectedSupplierIds); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label>Kode *</Label><Input required value={form.product_code ?? ""} onChange={(e) => setForm({ ...form, product_code: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Barcode</Label><Input value={form.barcode ?? ""} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
@@ -223,11 +251,21 @@ function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Produ
           <div className="space-y-1.5"><Label>Harga Beli</Label><Input type="number" value={form.current_buy_price ?? 0} onChange={(e) => setForm({ ...form, current_buy_price: n(e.target.value) })} /></div>
           <div className="space-y-1.5"><Label>Harga Retail</Label><Input type="number" value={form.current_retail_price ?? 0} onChange={(e) => setForm({ ...form, current_retail_price: n(e.target.value) })} /></div>
           <div className="space-y-1.5"><Label>Harga Grosir</Label><Input type="number" value={form.current_wholesale_price ?? 0} onChange={(e) => setForm({ ...form, current_wholesale_price: n(e.target.value) })} /></div>
-          <div className="space-y-1.5"><Label>Supplier</Label>
-            <Select value={form.supplier_id ?? ""} onValueChange={(v) => setForm({ ...form, supplier_id: v || null })}>
-              <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-              <SelectContent>{suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="space-y-1.5 col-span-2"><Label>Supplier (bisa pilih lebih dari satu)</Label>
+            <div className="border rounded-md max-h-40 overflow-y-auto divide-y">
+              {suppliers.length === 0 && <p className="text-xs text-muted-foreground p-3">Belum ada data supplier.</p>}
+              {suppliers.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 p-2 text-sm cursor-pointer hover:bg-accent">
+                  <input
+                    type="checkbox"
+                    checked={selectedSupplierIds.includes(s.id)}
+                    onChange={(e) => setSelectedSupplierIds((prev) => e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id))}
+                  />
+                  {s.supplier_name}
+                </label>
+              ))}
+            </div>
+            {selectedSupplierIds.length === 0 && <p className="text-xs text-muted-foreground">Belum ada supplier dipilih. Barang ini tidak akan muncul di pilihan barang saat membuat transaksi Pembelian dari supplier manapun.</p>}
           </div>
         </div>
         <DialogFooter><Button type="submit" disabled={loading}>{loading ? "Menyimpan..." : "Simpan"}</Button></DialogFooter>
