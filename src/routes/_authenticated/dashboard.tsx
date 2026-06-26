@@ -115,7 +115,7 @@ function DashboardPage() {
   const { data: lowStockProducts = [] } = useQuery({
     queryKey: ["dash-low-stock"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("id, product_code, product_name, minimum_stock, default_unit, supplier:supplier_id(supplier_name)").is("deleted_at", null).eq("is_active", true).gt("minimum_stock", 0).limit(50);
+      const { data } = await supabase.from("products").select("id, product_code, product_name, minimum_stock, default_unit").is("deleted_at", null).eq("is_active", true).gt("minimum_stock", 0).limit(50);
       if (!data || data.length === 0) return [];
       const { data: movements } = await supabase.from("stock_movements").select("product_id, qty_in, qty_out");
       const stockMap: Record<string, number> = {};
@@ -123,13 +123,22 @@ function DashboardPage() {
         if (!stockMap[m.product_id]) stockMap[m.product_id] = 0;
         stockMap[m.product_id] += Number(m.qty_in) - Number(m.qty_out);
       }
+      const candidateIds = data.filter((p: any) => (stockMap[p.id] ?? 0) <= p.minimum_stock).map((p: any) => p.id);
+      const supplierMap: Record<string, string[]> = {};
+      if (candidateIds.length > 0) {
+        const { data: ps } = await supabase.from("product_suppliers").select("product_id, supplier:supplier_id(supplier_name)").in("product_id", candidateIds);
+        for (const row of (ps ?? []) as any[]) {
+          if (!supplierMap[row.product_id]) supplierMap[row.product_id] = [];
+          if (row.supplier?.supplier_name) supplierMap[row.product_id].push(row.supplier.supplier_name);
+        }
+      }
       return data.filter((p: any) => (stockMap[p.id] ?? 0) <= p.minimum_stock)
         .map((p: any) => {
           const current_stock = stockMap[p.id] ?? 0;
           return {
             ...p,
             current_stock,
-            supplier_name: p.supplier?.supplier_name ?? "-",
+            supplier_name: supplierMap[p.id]?.length ? supplierMap[p.id].join(", ") : "-",
             qty_needed: Math.max(0, p.minimum_stock - current_stock),
           };
         })
