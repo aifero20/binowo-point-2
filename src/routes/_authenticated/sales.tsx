@@ -376,7 +376,10 @@ function SalesPOS() {
                     <div key={i} className="p-2 flex gap-2 items-start text-sm">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{l.product_name}</p>
-                        <p className="text-xs text-muted-foreground">{formatRp(l.selling_price)} x {l.qty}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatRp(l.selling_price)} x {l.qty}
+                          <span className="font-medium text-foreground"> = {formatRp(l.qty * l.selling_price * (1 - (l.discount ?? 0) / 100))}</span>
+                        </p>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
                         <Input type="number" min={1} value={l.qty} onChange={(e) => { const newQty = Number(e.target.value) || 1; const avail = (stockMap as any)[l.product_id] ?? 0; setCart((c) => c.map((x, j) => j === i ? { ...x, qty: newQty, overStock: newQty > avail && avail >= 0 } : x)); }} onFocus={(e) => e.target.select()} autoFocus={activeCartIdx === i} className={`w-16 h-8 ${l.overStock ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
