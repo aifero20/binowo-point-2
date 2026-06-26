@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,19 +92,64 @@ function ReturnsPage() {
     queryFn: async () => { const { data } = await supabase.from("suppliers").select("id, supplier_name").is("deleted_at", null).order("supplier_name"); return data ?? []; },
   });
 
+  // Relasi produk <-> supplier (dari Master Barang), khusus untuk filter dua arah di Retur Pembelian
+  const { data: productSupplierLinks = [] } = useQuery({
+    queryKey: ["product-suppliers-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("product_suppliers").select("product_id, supplier_id");
+      return data ?? [];
+    },
+  });
+
+  const productToSuppliers = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const row of productSupplierLinks as any[]) {
+      if (!map[row.product_id]) map[row.product_id] = new Set();
+      map[row.product_id].add(row.supplier_id);
+    }
+    return map;
+  }, [productSupplierLinks]);
+
+  const supplierToProducts = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const row of productSupplierLinks as any[]) {
+      if (!map[row.supplier_id]) map[row.supplier_id] = new Set();
+      map[row.supplier_id].add(row.product_id);
+    }
+    return map;
+  }, [productSupplierLinks]);
+
+  // Supplier yang menyediakan SEMUA produk yang sudah dipilih di form Retur Pembelian
+  const eligibleSupplierIdsForLines = useMemo(() => {
+    if (lines.length === 0) return null;
+    let result: Set<string> | null = null;
+    for (const l of lines) {
+      const sups = productToSuppliers[l.product_id] ?? new Set<string>();
+      result = result === null ? new Set(sups) : new Set([...result].filter((id) => sups.has(id)));
+    }
+    return result ?? new Set<string>();
+  }, [lines, productToSuppliers]);
+
   const { data: warehouses = [] } = useQuery({
     queryKey: ["warehouses-active"],
     queryFn: async () => { const { data } = await supabase.from("warehouses").select("id, warehouse_name").eq("is_active", true); return data ?? []; },
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: rawProducts = [] } = useQuery({
     queryKey: ["pos-products", searchProduct],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_name, default_unit, current_buy_price").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_name, default_unit, current_buy_price").is("deleted_at", null).limit(50);
       if (searchProduct) q = q.ilike("product_name", `%${searchProduct}%`);
       const { data } = await q; return data ?? [];
     },
   });
+
+  // Kalau supplier sudah dipilih, hanya tampilkan barang yang disediakan supplier tersebut
+  const products = useMemo(() => {
+    if (!supplierId) return rawProducts;
+    const allowed = supplierToProducts[supplierId] ?? new Set<string>();
+    return (rawProducts as any[]).filter((p) => allowed.has(p.id));
+  }, [rawProducts, supplierId, supplierToProducts]);
 
   const { data: srProducts = [] } = useQuery({
     queryKey: ["pos-products-sr", srSearch],
@@ -246,8 +291,15 @@ function ReturnsPage() {
                       <div className="space-y-1.5"><Label>Supplier *</Label>
                         <Select value={supplierId} onValueChange={setSupplierId}>
                           <SelectTrigger><SelectValue placeholder="Pilih supplier..." /></SelectTrigger>
-                          <SelectContent>{(suppliers as any[]).map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}</SelectContent>
+                          <SelectContent>
+                            {(suppliers as any[])
+                              .filter((s) => eligibleSupplierIdsForLines === null || eligibleSupplierIdsForLines.has(s.id))
+                              .map((s) => <SelectItem key={s.id} value={s.id}>{s.supplier_name}</SelectItem>)}
+                          </SelectContent>
                         </Select>
+                        {eligibleSupplierIdsForLines !== null && eligibleSupplierIdsForLines.size === 0 && (
+                          <p className="text-xs text-destructive">Barang yang sudah dipilih tidak memiliki satu supplier yang sama. Hapus salah satu barang, atau pilih barang dari supplier yang sama.</p>
+                        )}
                       </div>
                       <div className="space-y-1.5"><Label>Gudang *</Label>
                         <Select value={warehouseId} onValueChange={setWarehouseId}>
