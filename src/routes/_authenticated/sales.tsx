@@ -67,7 +67,7 @@ function SalesPOS() {
   const { data: products = [] } = useQuery({
     queryKey: ["pos-products", search],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_code, product_name, default_unit, current_buy_price, current_retail_price, current_wholesale_price, product_units(id, unit_name, conversion_qty, retail_price, wholesale_price)").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_code, product_name, default_unit, barcode, current_buy_price, current_retail_price, current_wholesale_price, product_units(id, unit_name, conversion_qty, retail_price, wholesale_price)").is("deleted_at", null).limit(20);
       if (search) q = q.or(`product_name.ilike.%${search}%,product_code.ilike.%${search}%,barcode.ilike.%${search}%`);
       const { data, error } = await q;
       if (error) throw error;
@@ -300,7 +300,27 @@ function SalesPOS() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" />Cari Barang</CardTitle>
-                <Input autoFocus placeholder="Scan barcode / cari nama barang... (F2)" value={search} onChange={(e) => setSearch(e.target.value)} className="h-12 text-base" />
+                <Input
+                  autoFocus
+                  placeholder="Scan barcode / cari nama barang... (F2)"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    const code = search.trim().toLowerCase();
+                    if (!code) return;
+                    const match = (products as any[]).find((p) => (p.barcode ?? "").toLowerCase() === code);
+                    if (match) {
+                      addToCart(match, match.default_unit, selectedCustomerType === "GROSIR" ? Number(match.current_wholesale_price ?? match.current_retail_price) : Number(match.current_retail_price), 1);
+                      toast.success(`${match.product_name} ditambahkan`);
+                      setSearch("");
+                    } else {
+                      toast.error("Barcode tidak ditemukan di Master Barang");
+                    }
+                  }}
+                  className="h-12 text-base"
+                />
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
