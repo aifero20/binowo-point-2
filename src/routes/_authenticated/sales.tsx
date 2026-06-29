@@ -296,8 +296,8 @@ function SalesPOS() {
         <TabsList><TabsTrigger value="pos">POS Kasir</TabsTrigger><TabsTrigger value="held">Hold ({heldTransactions.length})</TabsTrigger><TabsTrigger value="history">Riwayat</TabsTrigger></TabsList>
 
         <TabsContent value="pos">
-          <div className="grid gap-4 lg:grid-cols-[1fr_400px]">
-            <Card>
+          <div className="grid gap-4 lg:grid-cols-[1fr_400px] items-stretch">
+            <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" />Cari Barang</CardTitle>
                 <Input
@@ -322,8 +322,8 @@ function SalesPOS() {
                   className="h-12 text-base"
                 />
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+              <CardContent className="p-0 flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
                   <Table>
                     <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
                     <TableBody>
@@ -349,9 +349,9 @@ function SalesPOS() {
               </CardContent>
             </Card>
 
-            <Card className="h-fit sticky top-20">
+            <Card className="flex flex-col">
               <CardHeader><CardTitle className="flex items-center justify-between">Keranjang{offlineMode && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-normal">OFFLINE</span>}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1.5">
                     <Label>Gudang</Label>
@@ -392,7 +392,7 @@ function SalesPOS() {
                     <Input type="number" min={0} max={100} value={headerDiscount} onChange={(e) => setHeaderDiscount(Number(e.target.value))} placeholder="0" />
                   </div>
                 </div>
-                <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                <div className="border rounded-md divide-y max-h-[210px] overflow-y-auto">
                   {cart.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Keranjang kosong</p>}
                   {cart.map((l, i) => (
                     <div key={i} className="p-2 flex gap-2 items-start text-sm">
