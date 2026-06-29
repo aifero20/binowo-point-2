@@ -138,7 +138,7 @@ function ReturnsPage() {
   const { data: rawProducts = [] } = useQuery({
     queryKey: ["pos-products", searchProduct],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_name, default_unit, current_buy_price").is("deleted_at", null).limit(50);
+      let q = supabase.from("products").select("id, product_name, default_unit, current_buy_price, barcode").is("deleted_at", null).limit(50);
       if (searchProduct) q = q.ilike("product_name", `%${searchProduct}%`);
       const { data } = await q; return data ?? [];
     },
@@ -154,7 +154,7 @@ function ReturnsPage() {
   const { data: srProducts = [] } = useQuery({
     queryKey: ["pos-products-sr", srSearch],
     queryFn: async () => {
-      let q = supabase.from("products").select("id, product_name, default_unit, current_retail_price").is("deleted_at", null).limit(20);
+      let q = supabase.from("products").select("id, product_name, default_unit, current_retail_price, barcode").is("deleted_at", null).limit(20);
       if (srSearch) q = q.ilike("product_name", `%${srSearch}%`);
       const { data } = await q; return data ?? [];
     },
@@ -206,7 +206,11 @@ function ReturnsPage() {
   const grandTotal = lines.reduce((s, l) => s + l.qty * l.buy_price, 0);
 
   function addLine(p: any) {
-    setLines((prev) => prev.find((l) => l.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_buy_price) }]);
+    setLines((prev) => {
+      const existing = prev.find((l) => l.product_id === p.id);
+      if (existing) return prev.map((l) => l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l);
+      return [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_buy_price) }];
+    });
   }
 
   const save = useMutation({
@@ -311,7 +315,26 @@ function ReturnsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Cari Barang</Label>
-                      <Input autoFocus placeholder="Cari nama barang..." value={searchProduct} onChange={(e) => setSearchProduct(e.target.value)} />
+                      <Input
+                        autoFocus
+                        placeholder="Scan barcode / cari nama barang..."
+                        value={searchProduct}
+                        onChange={(e) => setSearchProduct(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          const code = searchProduct.trim().toLowerCase();
+                          if (!code) return;
+                          const match = (products as any[]).find((p) => (p.barcode ?? "").toLowerCase() === code);
+                          if (match) {
+                            addLine(match);
+                            toast.success(`${match.product_name} ditambahkan`);
+                            setSearchProduct("");
+                          } else {
+                            toast.error("Barcode tidak ditemukan (atau supplier belum cocok)");
+                          }
+                        }}
+                      />
                       <div className="border rounded max-h-48 overflow-y-auto divide-y">
                         {(products as any[]).map((p) => (
                           <div key={p.id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => addLine(p)}>
@@ -429,7 +452,30 @@ function ReturnsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Cari Barang</Label>
-                      <Input autoFocus placeholder="Cari nama barang..." value={srSearch} onChange={(e) => setSrSearch(e.target.value)} />
+                      <Input
+                        autoFocus
+                        placeholder="Scan barcode / cari nama barang..."
+                        value={srSearch}
+                        onChange={(e) => setSrSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          const code = srSearch.trim().toLowerCase();
+                          if (!code) return;
+                          const match = (srProducts as any[]).find((p) => (p.barcode ?? "").toLowerCase() === code);
+                          if (match) {
+                            setSrLines((prev) => {
+                              const existing = prev.find((l) => l.product_id === match.id);
+                              if (existing) return prev.map((l) => l.product_id === match.id ? { ...l, qty: l.qty + 1 } : l);
+                              return [...prev, { product_id: match.id, product_name: match.product_name, unit_name: match.default_unit, qty: 1, buy_price: Number(match.current_retail_price) }];
+                            });
+                            toast.success(`${match.product_name} ditambahkan`);
+                            setSrSearch("");
+                          } else {
+                            toast.error("Barcode tidak ditemukan di Master Barang");
+                          }
+                        }}
+                      />
                       <div className="border rounded max-h-48 overflow-y-auto divide-y">
                         {(srProducts as any[]).map((p) => (
                           <div key={p.id} className="p-2 flex justify-between text-sm hover:bg-accent cursor-pointer" onClick={() => setSrLines((prev) => prev.find((l) => l.product_id === p.id) ? prev : [...prev, { product_id: p.id, product_name: p.product_name, unit_name: p.default_unit, qty: 1, buy_price: Number(p.current_retail_price) }])}>
