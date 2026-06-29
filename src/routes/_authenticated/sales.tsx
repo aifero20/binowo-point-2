@@ -578,8 +578,16 @@ function SalesPOS() {
       {printData && (
         <Dialog open={!!printData} onOpenChange={() => setPrintData(null)}>
           <DialogContent className="max-w-xs">
+            <style>{`
+              @media print {
+                body * { visibility: hidden; }
+                #print-area, #print-area * { visibility: visible; }
+                #print-area { position: absolute; left: 0; top: 0; width: 80mm; padding: 4mm; }
+                @page { size: 80mm auto; margin: 0; }
+              }
+            `}</style>
             <DialogHeader><DialogTitle className="text-center">Struk Pembayaran</DialogTitle></DialogHeader>
-            <div className="font-mono text-xs space-y-1 border rounded p-3">
+            <div id="print-area" className="font-mono text-xs space-y-1 border rounded p-3">
               <p className="text-center font-bold text-sm">GROSIR ROKOK BINOWO</p>
               <p className="text-center">Binowo, Balarejo, Kebonsari</p>
               <p className="text-center">Telp / WA : 0813 3113 1048</p>
