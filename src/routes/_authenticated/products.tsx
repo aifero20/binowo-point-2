@@ -244,7 +244,7 @@ function ProductForm({ editing, suppliers, onSubmit, loading }: { editing: Produ
       <form onSubmit={(e) => { e.preventDefault(); onSubmit(form, selectedSupplierIds); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><Label>Kode *</Label><Input required value={form.product_code ?? ""} onChange={(e) => setForm({ ...form, product_code: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Barcode</Label><Input value={form.barcode ?? ""} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>Barcode</Label><Input value={form.barcode ?? ""} onChange={(e) => setForm({ ...form, barcode: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} placeholder="Klik di sini lalu scan barcode..." /></div>
           <div className="space-y-1.5 col-span-2"><Label>Nama Barang *</Label><Input required value={form.product_name ?? ""} onChange={(e) => setForm({ ...form, product_name: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Satuan Default</Label><Input value={form.default_unit ?? ""} onChange={(e) => setForm({ ...form, default_unit: e.target.value })} /></div>
           <div className="space-y-1.5"><Label>Min Stok</Label><Input type="number" value={form.minimum_stock ?? 0} onChange={(e) => setForm({ ...form, minimum_stock: n(e.target.value) })} /></div>
