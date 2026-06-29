@@ -392,7 +392,7 @@ function SalesPOS() {
                     <Input type="number" min={0} max={100} value={headerDiscount} onChange={(e) => setHeaderDiscount(Number(e.target.value))} placeholder="0" />
                   </div>
                 </div>
-                <div className="border rounded-md divide-y max-h-[210px] overflow-y-auto">
+                <div className="border rounded-md divide-y max-h-[150px] overflow-y-auto">
                   {cart.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Keranjang kosong</p>}
                   {cart.map((l, i) => (
                     <div key={i} className="p-2 flex gap-2 items-start text-sm">
