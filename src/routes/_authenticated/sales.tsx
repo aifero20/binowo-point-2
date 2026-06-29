@@ -323,27 +323,29 @@ function SalesPOS() {
                 />
               </CardHeader>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
-                  <TableBody>
-                    {products.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Ketik untuk cari barang...</TableCell></TableRow>}
-                    {products.map((p) => (
-                      <TableRow key={p.id} className="cursor-pointer hover:bg-accent/40" onClick={() => addToCart(p, p.default_unit, selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price), 1)}>
-                        <TableCell className="font-mono text-xs">{p.product_code}</TableCell>
-                        <TableCell className="font-medium">{p.product_name}</TableCell>
-                        <TableCell className="text-right">{formatRp(selectedCustomerType === "GROSIR" ? (p.current_wholesale_price ?? p.current_retail_price) : p.current_retail_price)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); addToCart(p, p.default_unit, selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price), 1); }}>+ {p.default_unit}</Button>
-                            {(p.product_units as { id: string; unit_name: string; conversion_qty: number; retail_price: number; wholesale_price?: number }[] ?? []).map((u) => (
-                              <Button key={u.id} size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); addToCart(p, u.unit_name, selectedCustomerType === "GROSIR" ? Number(u.wholesale_price ?? u.retail_price) : Number(u.retail_price), Number(u.conversion_qty)); }}>+ {u.unit_name}</Button>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="max-h-[600px] overflow-y-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Kode</TableHead><TableHead>Nama</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="w-24" /></TableRow></TableHeader>
+                    <TableBody>
+                      {products.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Ketik untuk cari barang...</TableCell></TableRow>}
+                      {products.map((p) => (
+                        <TableRow key={p.id} className="cursor-pointer hover:bg-accent/40" onClick={() => addToCart(p, p.default_unit, selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price), 1)}>
+                          <TableCell className="font-mono text-xs">{p.product_code}</TableCell>
+                          <TableCell className="font-medium">{p.product_name}</TableCell>
+                          <TableCell className="text-right">{formatRp(selectedCustomerType === "GROSIR" ? (p.current_wholesale_price ?? p.current_retail_price) : p.current_retail_price)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              <Button size="sm" onClick={(e) => { e.stopPropagation(); addToCart(p, p.default_unit, selectedCustomerType === "GROSIR" ? Number(p.current_wholesale_price ?? p.current_retail_price) : Number(p.current_retail_price), 1); }}>+ {p.default_unit}</Button>
+                              {(p.product_units as { id: string; unit_name: string; conversion_qty: number; retail_price: number; wholesale_price?: number }[] ?? []).map((u) => (
+                                <Button key={u.id} size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); addToCart(p, u.unit_name, selectedCustomerType === "GROSIR" ? Number(u.wholesale_price ?? u.retail_price) : Number(u.retail_price), Number(u.conversion_qty)); }}>+ {u.unit_name}</Button>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
