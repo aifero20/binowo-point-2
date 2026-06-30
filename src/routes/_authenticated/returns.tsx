@@ -218,7 +218,9 @@ function ReturnsPage() {
       if (!supplierId) throw new Error("Pilih supplier");
       if (!warehouseId) throw new Error("Pilih gudang");
       if (lines.length === 0) throw new Error("Tambah item dulu");
-      const return_number = "RTR" + Date.now();
+      const { data: numberResult, error: numErr } = await supabase.rpc("get_next_receipt_number", { p_doc_type: "purchase_return", p_prefix: "RTR" } as never);
+      if (numErr) throw numErr;
+      const return_number = numberResult as unknown as string;
       const { data: header, error: he } = await supabase.from("purchase_returns").insert({ return_number, supplier_id: supplierId, grand_total: grandTotal, notes, created_by: user!.id } as never).select("id").single();
       if (he) throw he;
       const rid = (header as { id: string }).id;
@@ -247,7 +249,9 @@ function ReturnsPage() {
     mutationFn: async () => {
       if (!srWarehouseId) throw new Error("Pilih gudang");
       if (srLines.length === 0) throw new Error("Tambah item dulu");
-      const return_number = "RSL" + Date.now();
+      const { data: numberResult, error: numErr } = await supabase.rpc("get_next_receipt_number", { p_doc_type: "sales_return", p_prefix: "RSL" } as never);
+      if (numErr) throw numErr;
+      const return_number = numberResult as unknown as string;
       const grand_total = srLines.reduce((s, l) => s + l.qty * l.buy_price, 0);
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number: return_number, cashier_id: user!.id, subtotal: grand_total, grand_total, payment_method: "RETUR", transaction_status: "VOID", hold_status: false, customer_id: srCustomerId && srCustomerId !== "none" ? srCustomerId : null } as never).select("id").single();
       if (he) throw he;

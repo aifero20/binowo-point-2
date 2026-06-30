@@ -233,7 +233,9 @@ function SalesPOS() {
         const names = overStockItems.map((l) => `${l.product_name} (stok: ${freshStock[l.product_id] ?? 0})`).join(", ");
         throw new Error(`Stok tidak cukup: ${names}`);
       }
-      const sales_number = "SO" + Date.now();
+      const { data: numberResult, error: numErr } = await supabase.rpc("get_next_receipt_number", { p_doc_type: "sales", p_prefix: "BW" } as never);
+      if (numErr) throw numErr;
+      const sales_number = numberResult as unknown as string;
       const grossTotal = cart.reduce((s, l) => s + l.qty * l.selling_price, 0);
       const { data: header, error: he } = await supabase.from("sales_headers").insert({ sales_number, transaction_date: new Date().toISOString(), customer_id: customerId === "none" ? null : customerId, cashier_id: user!.id, subtotal: grossTotal, grand_total: subtotal, discount: grossTotal - subtotal, payment_amount: paymentAmount, change_amount: change, payment_method: paymentMethod, transaction_status: "SELESAI", hold_status: false } as never).select("id").single();
       if (he) throw he;
